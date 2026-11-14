@@ -29,7 +29,7 @@ class TouchdownNet(nn.Module):
         feat = 0
         if use_cnn:
             self.cnn = nn.Sequential(
-                nn.Conv2d(in_ch, width, 3, 1, 1, bias=False),
+                nn.Conv2d(in_ch, width, 3, 2, 1, bias=False),  # stride-2 stem: 4x fewer FLOPs
                 nn.BatchNorm2d(width),
                 nn.ReLU(),
                 Block(width, width),

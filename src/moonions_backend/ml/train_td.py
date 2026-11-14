@@ -16,7 +16,6 @@ import numpy as np
 import torch
 from scipy.stats import spearmanr
 from torch import nn
-from torch.utils.data import DataLoader, TensorDataset
 
 from ..config import CACHE, MODELS
 from .simulate import DEFAULT, time_outcomes
@@ -106,59 +105,74 @@ def gates_for_dates(lat, lon, elev, horizon, n_dates=48):
     return G
 
 
-def train_one(variant, seed, d, emb, split, epochs, batch, lr, dev, verbose):
+def train_one(variant, seed, d, emb, split, epochs, batch, lr, dev, verbose, patience=12):
+    """GPU-resident training: data lives on the GPU, shuffling/augmentation happen there, mixed precision."""
     train, val = split["train"], split["val"]
-    Xt, Xp, Y = d["Xtn"], d["X_patch"], d["Y"]
     use_cnn, use_emb = variant in ("cnn", "both"), variant in ("lfm", "both")
-    T = lambda a: torch.from_numpy(np.ascontiguousarray(a)).float()  # noqa: E731
-    E = emb if use_emb else np.zeros((len(Y), 1), np.float32)
-    P = Xp if use_cnn else np.zeros((len(Y), 1, 1, 1), np.float32)
-    prior = d["prior"]
-    ds = TensorDataset(T(P[train]), T(Xt[train]), T(E[train]), T(prior[train]), T(Y[train][:, :2]))
+    G = lambda a: torch.from_numpy(np.ascontiguousarray(a)).float().to(dev)  # noqa: E731
+    Xt, Y, prior = G(d["Xtn"]), G(d["Y"][:, :2]), G(d["prior"])
+    P = G(d["X_patch"]).contiguous(memory_format=torch.channels_last) if use_cnn else None
+    E = G(emb) if use_emb else None
+    tr_idx = torch.from_numpy(np.flatnonzero(train)).to(dev)
+    va_idx = torch.from_numpy(np.flatnonzero(val)).to(dev)
     torch.manual_seed(seed)
-    np.random.seed(seed)
-    m = TouchdownNet(n_tab=Xt.shape[1], in_ch=Xp.shape[1], use_cnn=use_cnn, emb_dim=E.shape[1] if use_emb else 0).to(dev)
+    m = TouchdownNet(n_tab=Xt.shape[1], in_ch=d["X_patch"].shape[1], use_cnn=use_cnn, emb_dim=E.shape[1] if use_emb else 0).to(dev)
+    m = m.to(memory_format=torch.channels_last)
+    steps = max(1, len(tr_idx) // batch)
     opt = torch.optim.AdamW(m.parameters(), lr=lr, weight_decay=2e-4)
-    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=lr, total_steps=epochs * (len(ds) // batch + 1))
+    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=lr, total_steps=epochs * steps)
+    scaler = torch.amp.GradScaler(enabled=dev == "cuda")
     bce = nn.BCEWithLogitsLoss(reduction="none")
     w = torch.tensor([1.0, 0.5], device=dev)
 
-    def predict(mask):
-        m.eval()
-        idx = np.flatnonzero(mask)
-        out = []
-        with torch.no_grad():
-            for i in range(0, len(idx), 4096):
-                s = idx[i : i + 4096]
-                o = m(T(P[s]).to(dev) if use_cnn else None, T(Xt[s]).to(dev), T(E[s]).to(dev) if use_emb else None, T(prior[s, 0]).to(dev), T(prior[s, 1]).to(dev))
-                out.append(torch.sigmoid(o).cpu().numpy())
-        return np.concatenate(out)
+    def forward(idx, augment=False):
+        p = None
+        if use_cnn:
+            p = P[idx]
+            if augment:
+                p = torch.rot90(p, int(torch.randint(0, 4, (1,))), dims=(2, 3))
+                if torch.rand(1) < 0.5:
+                    p = torch.flip(p, dims=(3,))
+        return m(p, Xt[idx], E[idx] if use_emb else None, prior[idx, 0], prior[idx, 1])
 
-    best, best_state, curve = 1e9, None, []
+    def predict_idx(idx):
+        m.eval()
+        with torch.no_grad(), torch.autocast(dev, dtype=torch.float16, enabled=dev == "cuda"):
+            out = torch.cat([torch.sigmoid(forward(idx[i : i + 8192]).float()) for i in range(0, len(idx), 8192)])
+        return out.cpu().numpy()
+
+    def predict(mask):
+        return predict_idx(torch.from_numpy(np.flatnonzero(mask)).to(dev))
+
+    yv = d["Y"][val, 0]
+    best, best_state, curve, bad = 1e9, None, [], 0
     for ep in range(epochs):
         m.train()
-        tot, nb = 0.0, 0
-        for xp, xt, xe, pr, y in DataLoader(ds, batch_size=batch, shuffle=True, drop_last=True):
-            if use_cnn:
-                xp = torch.rot90(xp, int(torch.randint(0, 4, (1,))), dims=(2, 3))
-                if torch.rand(1) < 0.5:
-                    xp = torch.flip(xp, dims=(3,))
-            o = m(xp.to(dev) if use_cnn else None, xt.to(dev), xe.to(dev) if use_emb else None, pr[:, 0].to(dev), pr[:, 1].to(dev))
-            loss = (bce(o, y.to(dev)) * w).mean()
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
+        perm = tr_idx[torch.randperm(len(tr_idx), device=dev)]
+        tot = torch.zeros((), device=dev)
+        for k in range(steps):
+            idx = perm[k * batch : (k + 1) * batch]
+            with torch.autocast(dev, dtype=torch.float16, enabled=dev == "cuda"):
+                o = forward(idx, augment=True)
+            loss = (bce(o.float(), Y[idx]) * w).mean()
+            opt.zero_grad(set_to_none=True)
+            scaler.scale(loss).backward()
+            scaler.step(opt)
+            scaler.update()
             sched.step()
-            tot += loss.item()
-            nb += 1
-        pv = predict(val)
-        mae = float(np.mean(np.abs(pv[:, 0] - Y[val, 0])))
-        rho = float(spearmanr(pv[:, 0], Y[val, 0]).statistic)
-        curve.append({"epoch": ep + 1, "train_loss": tot / nb, "val_mae": mae, "val_spearman": rho})
+            tot += loss.detach()
+        pv = predict_idx(va_idx)
+        mae = float(np.mean(np.abs(pv[:, 0] - yv)))
+        rho = float(spearmanr(pv[:, 0], yv).statistic)
+        curve.append({"epoch": ep + 1, "train_loss": float(tot) / steps, "val_mae": mae, "val_spearman": rho})
         if verbose and ((ep + 1) % 10 == 0 or ep == 0):
-            print(f"  [{variant} s{seed}] epoch {ep+1:3d} train loss {tot/nb:.4f}  val MAE {mae:.4f}  val ρ {rho:.4f}", flush=True)
-        if mae < best:
-            best, best_state = mae, {k: v.detach().cpu().clone() for k, v in m.state_dict().items()}
+            print(f"  [{variant} s{seed}] epoch {ep+1:3d} train loss {float(tot)/steps:.4f}  val MAE {mae:.4f}  val ρ {rho:.4f}", flush=True)
+        if mae < best - 1e-5:
+            best, best_state, bad = mae, {k: v.detach().float().cpu().clone() for k, v in m.state_dict().items()}, 0
+        else:
+            bad += 1
+            if bad >= patience:
+                break
     m.load_state_dict(best_state)
     return m, predict, best, curve
 
@@ -182,6 +196,7 @@ def main(variants, n_seeds, epochs, batch, lr):
         rows = np.array([key[(round(float(a), 6), round(float(b), 6))] for a, b in zip(lat, lon)])
         emb = np.concatenate([e["center"], e["global"]], 1).astype(np.float32)[rows]
     dev = "cuda" if torch.cuda.is_available() else "cpu"
+    torch.backends.cudnn.benchmark = True
     Y = d["Y"]
     groups_test = np.random.default_rng(0).integers(0, 40, test.sum())  # random candidate pools for site picking
 
@@ -191,7 +206,8 @@ def main(variants, n_seeds, epochs, batch, lr):
         print(f"== variant {v} ({VARIANT_LABEL[v]})", flush=True)
         for s in range(n_seeds):
             m, predict, best, curve = train_one(v, s, d, emb, split, epochs, batch, lr, dev, verbose=(s == 0))
-            members.append({k: t.cpu() for k, t in m.state_dict().items()})
+            members.append({k: t.float().cpu() for k, t in m.state_dict().items()})
+            print(f"  seed {s}: stopped after {len(curve)} epochs", flush=True)
             pv.append(predict(val)[:, 0])
             pt.append(predict(test))
             curves.setdefault(v, []).append(curve)
@@ -277,7 +293,7 @@ if __name__ == "__main__":
     ap.add_argument("--variants", default="cnn,lfm,both")
     ap.add_argument("--seeds", type=int, default=5)
     ap.add_argument("--epochs", type=int, default=60)
-    ap.add_argument("--batch", type=int, default=256)
-    ap.add_argument("--lr", type=float, default=2e-3)
+    ap.add_argument("--batch", type=int, default=512)
+    ap.add_argument("--lr", type=float, default=3e-3)
     a = ap.parse_args()
     main(a.variants.split(","), a.seeds, a.epochs, a.batch, a.lr)

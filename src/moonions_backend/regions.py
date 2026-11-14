@@ -112,15 +112,24 @@ def _zones(success: np.ndarray, cells: int, res_m: float, ellipse_m: float, east
     lab, n = ndimage.label(good)
     if n == 0:
         return []
-    # distance (m) from each good cell to the nearest non-good cell = how big an ellipse fits there
-    margin = ndimage.distance_transform_edt(good) * res_m
+    # EDT measures centre-to-centre distance, not clearance to the unsafe cell's
+    # boundary. Subtract its half-diagonal for a conservative clearance bound.
+    # Pad with unsafe cells so the ellipse also stays inside the analysed region.
+    # Without this, a lone 250 m cell falsely claims room for a 180 m radius.
+    padded = np.pad(good, 1, constant_values=False)
+    margin = np.maximum(0.0, ndimage.distance_transform_edt(padded)[1:-1, 1:-1] * res_m - res_m / np.sqrt(2))
+    # The first and last samples lie on the region boundary, not half a cell
+    # inside it. Clamp clearance to that exact boundary as well.
+    row, col = np.indices(good.shape)
+    boundary = np.minimum.reduce([row, col, cells - 1 - row, cells - 1 - col]) * res_m
+    margin = np.minimum(margin, boundary)
     zones = []
     for z in range(1, n + 1):
         m = lab == z
         area_km2 = m.sum() * (res_m / 1000) ** 2
         mz = np.where(m, margin, -1)
         k = int(np.argmax(mz))
-        if mz.flat[k] < max(ellipse_m * 0.5, res_m * 0.5):
+        if mz.flat[k] < ellipse_m:
             continue  # the landing ellipse doesn't fit inside this patch
         zones.append(
             {
@@ -261,7 +270,7 @@ def recommend(regions: list[dict], start: datetime, days: float, step_hours: flo
     ]
     if zones:
         z = zones[0]
-        expl.append(f"Primary landing zone Z1: {z['area_km2']} km², ellipse fits with {z['margin_m']:.0f} m to spare, {z['mean_success']*100:.0f}% average success.")
+        expl.append(f"Primary landing zone Z1: {z['area_km2']} km², {z['margin_m']:.0f} m clearance to the zone boundary, {z['mean_success']*100:.0f}% average success.")
         if len(zones) > 1:
             expl.append(f"{len(zones)-1} backup zones inside the region, nearest {min(x['from_primary']['distance_m'] for x in zones[1:]) / 1000:.1f} km away.")
     else:

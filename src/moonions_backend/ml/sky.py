@@ -17,12 +17,14 @@ from ..ephemeris import get_ephem, to_utc
 
 
 def body_vectors_km(times: list[datetime]) -> dict[str, np.ndarray]:
-    """Sun & Earth position relative to the Moon's centre in MOON_ME frame, km, shape (T, 3)."""
+    """Apparent Sun & Earth position relative to the Moon's centre in MOON_ME frame, km, shape (T, 3)."""
     e = get_ephem()
     t = e.ts.from_datetimes([to_utc(x) for x in times])
     out = {}
     for name, body in (("sun", e.sun), ("earth", e.earth)):
-        v = (body - e.moon).at(t).frame_xyz(e.frame).km  # (3, T)
+        # apparent position from the Moon's centre: includes light travel time (8.3 min for the
+        # Sun) and aberration, matching JPL Horizons' apparent airless azimuth/elevation
+        v = e.moon.at(t).observe(body).apparent().frame_xyz(e.frame).km  # (3, T)
         out[name] = np.asarray(v).T
     return out
 

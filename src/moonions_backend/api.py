@@ -283,3 +283,13 @@ def site_conditions(
 ):
     """Sun & Earth vs the local skyline: countdowns to sunset/Earthset, power and comms windows."""
     return conditions.site_conditions(lat, _norm_lon(lon), start, days, step_min, comm_mask_deg, mission_hours)
+
+
+@app.get("/api/agents/run")
+def agents_run(start: datetime, days: float = Query(14.0, ge=1, le=30), stay_hours: float = Query(156.0, ge=12, le=720)):
+    """Run the mission-control agent team; streams one JSON event per line as the agents work."""
+    from fastapi.responses import StreamingResponse
+
+    from . import agents
+
+    return StreamingResponse(agents.stream(start, days, stay_hours), media_type="application/x-ndjson", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})

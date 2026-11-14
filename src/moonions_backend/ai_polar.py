@@ -138,7 +138,8 @@ def png(when_iso: str) -> bytes | None:
     i0 = np.minimum(t.astype(int), len(ramp) - 2)
     f = (t - i0)[..., None]
     rgb = ramp[i0] * (1 - f) + ramp[i0 + 1] * f
-    alpha = np.where(np.isnan(val), 0, 200).astype(np.uint8)
+    # low success fades out so the terrain shows through; high success is opaque
+    alpha = np.where(np.isnan(val), 0, 25 + 200 * np.clip(np.nan_to_num(val, nan=0), 0, 1) ** 1.5).astype(np.uint8)
     img = Image.fromarray(np.dstack([rgb.astype(np.uint8), alpha]), "RGBA")
     buf = io.BytesIO()
     img.save(buf, "PNG", optimize=True)

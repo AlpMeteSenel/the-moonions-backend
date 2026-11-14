@@ -131,6 +131,14 @@ Monte-Carlo (256 landers) on LOLA **20 m** south-polar terrain:
 * Model card with metrics vs physics-80 m and rule baselines, calibration, training curves:
   `GET /api/ai/model-card`.
 
+### Regions, not points (`regions.py`)
+NASA plans landings as regions (Artemis III: 15 × 15 km) and targets a landing ellipse inside them.
+For a region and time: AI touchdown × physics checks on a 250 m grid → viable area; **landing zones**
+= connected patches with success ≥ 80 % that contain the ±180 m (3σ) ellipse, ellipse placed at the
+most interior point; Z1 = primary target, other zones = backups with divert distance / decide-by;
+region timeline = viable share + best spot over time → region landing windows; planner ranks
+regions × times by best-spot success × √(viable share) and names a backup region.
+
 ### History
 * v0 (hazard_cnn): 3-class hazard from coarse terrain, 85 % balanced acc. vs 70 % for slope thresholds.
 * v1 (success_net): learned light/power/comms too. 97 % of labels were 0 (dark / no comms), the

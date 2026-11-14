@@ -250,3 +250,15 @@ def region_analyze(lat: float, lon: float, landing_time: datetime, half_size_m: 
 @app.get("/api/regions/timeline")
 def region_timeline(lat: float, lon: float, start: datetime, half_size_m: float = Query(7500.0, ge=500, le=20000), days: float = Query(30.0, gt=0, le=90), step_hours: float = Query(6.0, ge=1, le=48)):
     return regions.timeline(lat, _norm_lon(lon), half_size_m, start, days, step_hours)
+
+
+class SummaryRequest(BaseModel):
+    regions: list[Point] = Field(min_length=1, max_length=64)
+    time: datetime
+
+
+@app.post("/api/regions/summary")
+def regions_summary(req: SummaryRequest):
+    t = req.time.replace(minute=0, second=0, microsecond=0)
+    regs = [{"id": r.id, "lat": r.lat, "lon": _norm_lon(r.lon), "half_size_m": r.half_size_m} for r in req.regions]
+    return {"time": t.isoformat(), "regions": ai_polar.region_summaries(regs, t.isoformat())}

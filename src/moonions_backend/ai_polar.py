@@ -23,7 +23,7 @@ from .config import CACHE, MOON_RADIUS_M
 
 GRID = CACHE / "ai_polar_grid.npz"
 SPACING_M = 1500.0
-EDGE_LAT = 84.5  # map covers lat <= -84.5 (all Artemis III regions)
+EDGE_LAT = 83.4  # map covers lat <= -83.4 (all Artemis III regions incl. Nobile Rim 2)
 HALF_SIZE_M = 303960.0  # cap_s texture half-size (textures.json → caps.cap_s.half_size_m)
 PNG_PX = 512
 
@@ -153,3 +153,36 @@ if __name__ == "__main__":
     a = ap.parse_args()
     if a.precompute:
         precompute(a.workers)
+
+
+def region_summaries(regions: list[dict], when_iso: str) -> list[dict]:
+    """Fast per-region viable area at a time, from the cached 1.5 km polar AI grid (for map colouring)."""
+    from .dem import distance_bearing
+
+    succ = success_at(when_iso)
+    g = _grid()
+    out = []
+    for r in regions:
+        half = float(r.get("half_size_m") or 7500.0)
+        if succ is None or g is None or r["lat"] > -(EDGE_LAT - 0.2):
+            out.append({"id": r.get("id"), "available": False})
+            continue
+        d, b = distance_bearing(r["lat"], r["lon"], g["lat"], g["lon"])
+        e, n = d * np.sin(np.radians(b)), d * np.cos(np.radians(b))
+        m = (np.abs(e) <= half) & (np.abs(n) <= half)
+        if not m.any():
+            out.append({"id": r.get("id"), "available": False})
+            continue
+        s = succ[m]
+        cell_km2 = (SPACING_M / 1000) ** 2
+        out.append(
+            {
+                "id": r.get("id"),
+                "available": True,
+                "viable_share": round(float((s >= 0.8).mean()), 4),
+                "viable_km2": round(float((s >= 0.8).sum() * cell_km2), 1),
+                "best_success": round(float(s.max()), 4),
+                "samples": int(m.sum()),
+            }
+        )
+    return out

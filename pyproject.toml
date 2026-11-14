@@ -1,0 +1,41 @@
+[project]
+name = "moonions-backend"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Ali Emre Senel", email = "aliemre@senel.biz" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.162.7",
+    "imagecodecs>=2026.11.11",
+    "jplephem>=2.24",
+    "numpy>=2.5.4",
+    "pandas>=3.1.1",
+    "pillow>=12.2.0",
+    "pydantic>=2.14.3",
+    "scipy>=1.18.1",
+    "skyfield>=1.55",
+    "tifffile>=2026.11.12",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+moonions-backend = "moonions_backend:main"
+
+[project.optional-dependencies]
+ml = [
+    "ni-lfm",
+    "pyshtools>=4.14.1",
+    "torch>=2.12.0,<2.13",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.8,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+environments = ["sys_platform == 'linux'"]
+
+[tool.uv.sources]
+ni-lfm = { git = "https://github.com/NASA-IMPACT/NASA-IBM-Lunar-Foundation-Model", rev = "d54c67a" }

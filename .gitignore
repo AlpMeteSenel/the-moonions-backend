@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+data/raw/
+data/cache/
+data/textures/
+data/models/
+data/lbl/
+data/*.sqlite
+data/download.log
+data/*.log

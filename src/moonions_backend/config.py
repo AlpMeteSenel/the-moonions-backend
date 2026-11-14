@@ -17,4 +17,5 @@ for _p in (CACHE, TEXTURES, MODELS):
 MOON_RADIUS_M = 1_737_400.0
 MOON_G = 1.62  # m/s^2
 
-CORS_ORIGINS = os.environ.get("MOONIONS_CORS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+# "*" by default so the dashboard works when either side is tunnelled (e.g. ngrok); restrict via MOONIONS_CORS
+CORS_ORIGINS = os.environ.get("MOONIONS_CORS", "*").split(",")

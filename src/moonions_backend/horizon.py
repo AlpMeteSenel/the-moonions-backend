@@ -28,9 +28,9 @@ def _distances(max_km: float) -> np.ndarray:
 
 
 @lru_cache(maxsize=4096)
-def _profile_cached(lat_q: float, lon_q: float, max_km: float) -> np.ndarray:
+def _profile_cached(lat_q: float, lon_q: float, max_km: float, n_az: int = N_AZ) -> np.ndarray:
     dem = get_dem()
-    az = np.arange(N_AZ) * (360.0 / N_AZ)
+    az = np.arange(n_az) * (360.0 / n_az)
     d = _distances(max_km)
     AZ, D = np.meshgrid(az, d, indexing="ij")
     lat, lon = destination(lat_q, lon_q, AZ, D)
@@ -42,21 +42,23 @@ def _profile_cached(lat_q: float, lon_q: float, max_km: float) -> np.ndarray:
 
 
 class Horizon:
-    def __init__(self, lat: float, lon: float, max_km: float | None = None):
+    def __init__(self, lat: float, lon: float, max_km: float | None = None, n_az: int = N_AZ):
         # Far terrain only matters where the sun is low (high latitudes)
         if max_km is None:
             max_km = 150.0 if abs(lat) > 70 else 60.0
         self.lat, self.lon = lat, lon
-        self.profile = _profile_cached(round(lat, 4), round(lon, 4), max_km)
+        self.n_az = n_az
+        self.profile = _profile_cached(round(lat, 4), round(lon, 4), max_km, n_az)
 
     def at(self, az_deg) -> np.ndarray:
         """Terrain horizon elevation (deg) for the given azimuth(s), linear interpolation."""
-        step = 360.0 / N_AZ
+        n = self.n_az
+        step = 360.0 / n
         x = np.mod(np.asarray(az_deg), 360.0) / step
-        i0 = np.floor(x).astype(int) % N_AZ
-        i1 = (i0 + 1) % N_AZ
+        i0 = np.floor(x).astype(int) % n
+        i1 = (i0 + 1) % n
         f = x - np.floor(x)
         return self.profile[i0] * (1 - f) + self.profile[i1] * f
 
     def to_dict(self) -> dict:
-        return {"azimuth_step_deg": 360.0 / N_AZ, "elevation_deg": np.round(self.profile, 2).tolist()}
+        return {"azimuth_step_deg": 360.0 / self.n_az, "elevation_deg": np.round(self.profile, 2).tolist()}

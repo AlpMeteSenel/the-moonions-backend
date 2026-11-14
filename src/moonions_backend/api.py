@@ -13,7 +13,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import ai, ai_polar, ml_inference, regions, store
+from . import ai, ai_polar, conditions, ml_inference, regions, store
 from .backups import suggest_in_region
 from .config import CORS_ORIGINS, TEXTURES
 from .craters import get_craters
@@ -262,3 +262,17 @@ def regions_summary(req: SummaryRequest):
     t = req.time.replace(minute=0, second=0, microsecond=0)
     regs = [{"id": r.id, "lat": r.lat, "lon": _norm_lon(r.lon), "half_size_m": r.half_size_m} for r in req.regions]
     return {"time": t.isoformat(), "regions": ai_polar.region_summaries(regs, t.isoformat())}
+
+
+@app.get("/api/conditions")
+def site_conditions(
+    lat: float,
+    lon: float,
+    start: datetime,
+    days: float = Query(14.0, gt=0, le=60),
+    step_min: float = Query(10.0, ge=1, le=120),
+    comm_mask_deg: float = Query(1.0, ge=0, le=15),
+    mission_hours: float = Query(156.0, ge=1, le=720),
+):
+    """Sun & Earth vs the local skyline: countdowns to sunset/Earthset, power and comms windows."""
+    return conditions.site_conditions(lat, _norm_lon(lon), start, days, step_min, comm_mask_deg, mission_hours)

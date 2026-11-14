@@ -43,12 +43,20 @@ def sky_many(lat, lon, vecs: dict[str, np.ndarray], height_m=None) -> dict[str, 
     up, east, north = local_frames(lat, lon)
     pos_km = up * ((MOON_RADIUS_M + h) / 1000.0)[:, None]  # (N, 3)
     out = {}
+    dirs = {}
     for name, v in vecs.items():
         d = v[None, :, :] - pos_km[:, None, :]  # (N, T, 3)
-        d /= np.linalg.norm(d, axis=-1, keepdims=True)
+        dist = np.linalg.norm(d, axis=-1)
+        d = d / dist[..., None]
+        dirs[name] = d
         u = np.einsum("ntk,nk->nt", d, up)
         e = np.einsum("ntk,nk->nt", d, east)
         n = np.einsum("ntk,nk->nt", d, north)
         out[f"{name}_el"] = np.degrees(np.arcsin(np.clip(u, -1, 1)))
         out[f"{name}_az"] = np.degrees(np.arctan2(e, n)) % 360.0
+        out[f"{name}_dist_km"] = dist
+    if "sun" in dirs and "earth" in dirs:
+        # angular separation of the Sun and Earth seen from the site (for eclipses by Earth)
+        cos = np.clip(np.einsum("ntk,ntk->nt", dirs["sun"], dirs["earth"]), -1, 1)
+        out["sun_earth_sep_deg"] = np.degrees(np.arccos(cos))
     return out

@@ -18,7 +18,7 @@ from .backups import compass, divert_cost
 from .config import MODELS
 from .dem import destination, distance_bearing, offset_latlon
 from .ephemeris import to_utc
-from .horizon import N_AZ, Horizon
+from .horizon import Horizon
 
 log = logging.getLogger(__name__)
 CKPT = MODELS / "td_ensemble.pt"
@@ -123,12 +123,13 @@ def _sites(lats, lons):
 
 
 def _horizon_at(profiles: np.ndarray, az: np.ndarray) -> np.ndarray:
-    step = 360.0 / N_AZ
+    n = profiles.shape[1]  # azimuth bins (2° for bulk grids, 0.5° for detailed site analysis)
+    step = 360.0 / n
     x = np.mod(az, 360.0) / step
-    i0 = np.floor(x).astype(int) % N_AZ
+    i0 = np.floor(x).astype(int) % n
     f = x - np.floor(x)
     rows = np.arange(profiles.shape[0])[:, None]
-    return profiles[rows, i0] * (1 - f) + profiles[rows, (i0 + 1) % N_AZ] * f
+    return profiles[rows, i0] * (1 - f) + profiles[rows, (i0 + 1) % n] * f
 
 
 def physics_gates(lats, lons, elev, horizon, times: list[datetime]) -> dict[str, np.ndarray]:
@@ -146,7 +147,11 @@ def physics_gates(lats, lons, elev, horizon, times: list[datetime]) -> dict[str,
         s = sky_many(np.asarray(lats), np.asarray(lons), v, height_m=elev)
         sc = s["sun_el"] - _horizon_at(horizon, s["sun_az"])
         ec = s["earth_el"] - _horizon_at(horizon, s["earth_az"])
-        o = time_outcomes(sc, s["sun_el"], ec, DEFAULT)
+        from .conditions import EARTH_RADIUS_KM, SUN_RADIUS_KM, angular_radius, covered_fraction, disk_fraction_above
+
+        sun_r = angular_radius(SUN_RADIUS_KM, s["sun_dist_km"])
+        frac = disk_fraction_above(sc, sun_r) * (1 - covered_fraction(s["sun_earth_sep_deg"], sun_r, angular_radius(EARTH_RADIUS_KM, s["earth_dist_km"])))
+        o = time_outcomes(sc, s["sun_el"], ec, DEFAULT, sun_frac=frac)
         o["sun_clear0"], o["earth_clear0"] = sc[:, 0], ec[:, 0]
         for k in keys:
             out[k][:, j] = o[k]

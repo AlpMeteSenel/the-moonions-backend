@@ -42,6 +42,19 @@ Two repositories, one product:
 | JPL DE421 + `moon_pa_de421` + `moon_080317.tf` | JPL / NAIF | Sun & Earth position from any site/time |
 | Robbins 2018 crater database (1.3 M craters) | USGS Astrogeology | Crater hazard density |
 
+## Sun & Earth conditions (`conditions.py`, `GET /api/conditions`)
+
+The core of the challenge: Sun and Earth relative to the local skyline at a site and date.
+* positions: JPL DE421 + lunar PA frame (real orbits, libration), topocentric from the site;
+* skyline: LOLA horizon at 0.5° azimuth, 150 km, lunar curvature, no atmosphere/refraction;
+* finite disks: Sun ≈0.53°, Earth ≈1.9° from their actual distances; power ∝ visible fraction of
+  the solar disk (slow polar sunsets along ridges);
+* eclipses: Earth covering the Sun (validated on the 3 Mar 2026 lunar eclipse);
+* direct-to-Earth: Earth's centre ≥ 1° (configurable antenna mask) above the skyline;
+* rise/set to the minute (10-min grid + interpolation), countdowns to sunset/Earthset,
+  longest darkness, battery state of charge over the stay.
+The same physics drives the region analysis and AI maps.
+
 ## Scoring: plain-language factors
 
 Each factor is 0-100, with a one-line explanation the UI shows. All are computed from data;

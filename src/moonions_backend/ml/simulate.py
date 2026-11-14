@@ -54,6 +54,7 @@ class SimParams:
     panel_kw: float = 5.0  # vertical panels: output ≈ panel_kw·cos(sun el) when lit
     load_kw: float = 2.0
     comms_min_frac: float = 0.5
+    comm_mask_deg: float = 1.0  # Earth's centre must clear the skyline by this much for direct-to-Earth
     mission_hours: float = 156.0
     step_hours: float = 2.0
 
@@ -184,11 +185,17 @@ def energy_soc(sun_el: np.ndarray, lit: np.ndarray, p: SimParams = DEFAULT) -> n
     return soc / p.battery_kwh
 
 
-def time_outcomes(sun_clear: np.ndarray, sun_el: np.ndarray, earth_clear: np.ndarray, p: SimParams = DEFAULT) -> dict[str, np.ndarray]:
-    """Deterministic lighting / energy / comms outcomes for (N, T) clearance series (T = stay steps)."""
-    lit = sun_clear > 0.5
-    vis = earth_clear > 0.5
-    soc = energy_soc(sun_el, lit, p)
+def time_outcomes(sun_clear: np.ndarray, sun_el: np.ndarray, earth_clear: np.ndarray, p: SimParams = DEFAULT, sun_frac: np.ndarray | None = None) -> dict[str, np.ndarray]:
+    """Deterministic lighting / energy / comms outcomes for (N, T) clearance series (T = stay steps).
+
+    `sun_frac` (visible fraction of the solar disk incl. eclipses, see conditions.py) makes
+    sunlight and power physical; without it the Sun's centre clearance is used.
+    """
+    if sun_frac is None:
+        sun_frac = (sun_clear > 0.5).astype(float)
+    lit = sun_frac > 0.5
+    vis = earth_clear >= p.comm_mask_deg
+    soc = energy_soc(sun_el, sun_frac, p)
     dark = ~lit
     # longest continuous dark spell (hours)
     longest = np.zeros(lit.shape[0])

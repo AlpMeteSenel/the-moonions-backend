@@ -361,7 +361,7 @@ class Mission:
             else:
                 blockers = ", ".join(next(r["role"] for r in ROSTER if r["id"] == a) for a in p["vetoes"])
                 head = f"NO-GO: no option passes every check. Closest is {p['name']} at {_fmt_t(p['landing_time'])}, blocked by {blockers}."
-            self.emit("chief", "decision", head + " " + decision["rationale"], decision=decision)
+            self.emit("chief", "decision", head + " " + decision["rationale"], decision=decision, headline=head)
         except Exception as e:  # keep the stream well-formed for the UI
             self.emit("chief", "error", f"Mission control error: {e}")
         finally:

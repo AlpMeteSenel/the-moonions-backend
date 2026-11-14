@@ -25,6 +25,13 @@ from .terrain import terrain_patch
 
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="Lunar Landing Site Navigator", version="0.1.0")
+
+
+@app.on_event("shutdown")
+def _stop_workers():
+    from .regions import shutdown_pool
+
+    shutdown_pool()
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(GZipMiddleware, minimum_size=2048)
 app.mount("/static/textures", StaticFiles(directory=TEXTURES), name="textures")

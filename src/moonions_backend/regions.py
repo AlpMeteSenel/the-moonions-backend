@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import atexit
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -53,9 +54,26 @@ def _hz(args):
     return Horizon(lat, lon).profile.astype(np.float32)
 
 
-@lru_cache(maxsize=1)
+_POOL: ProcessPoolExecutor | None = None
+POOL_WORKERS = int(os.environ.get("MOONIONS_POOL_WORKERS", "4"))  # each worker holds its own DEM pages
+
+
 def _pool() -> ProcessPoolExecutor:
-    return ProcessPoolExecutor(max_workers=max(1, (os.cpu_count() or 2) - 1))
+    global _POOL
+    if _POOL is None:
+        _POOL = ProcessPoolExecutor(max_workers=max(1, min(POOL_WORKERS, (os.cpu_count() or 2) - 1)))
+        atexit.register(shutdown_pool)
+    return _POOL
+
+
+def shutdown_pool() -> None:
+    """Stop the horizon workers (called on server shutdown/reload so they never outlive it)."""
+    global _POOL
+    if _POOL is not None:
+        _POOL.shutdown(wait=False, cancel_futures=True)
+        for proc in list(getattr(_POOL, "_processes", {}).values()):
+            proc.terminate()
+        _POOL = None
 
 
 def _key(lat, lon, half, cells):

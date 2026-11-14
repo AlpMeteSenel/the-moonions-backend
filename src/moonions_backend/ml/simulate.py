@@ -115,7 +115,7 @@ def touchdown(lat: float, lon: float, p: SimParams = DEFAULT, truth: PolarImg | 
     if truth is None:
         raise FileNotFoundError("ldem_80s_20m not downloaded")
     dem = get_dem()
-    res = truth.map_scale
+    res = getattr(truth, "map_scale", None) or truth.resolution_m  # polar: 20/80 m, global: 474 m
     half = 4 * p.nav_sigma_m + p.hda_hop_m + 3 * res
     east, north, h, _ = dem.local_grid(lat, lon, half, res, source=truth)
     E, Nn = np.meshgrid(east, north)

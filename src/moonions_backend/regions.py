@@ -74,6 +74,8 @@ def region_grid(lat: float, lon: float, half_size_m: float, cells: int) -> dict:
     pts = list(zip(glat.tolist(), glon.tolist()))
     feats = list(_pool().map(_feat, pts, chunksize=32))
     ok = np.array([f is not None for f in feats])
+    if not ok.any():
+        raise ValueError("No terrain data for this region")
     tab = np.stack([f[0] if f is not None else np.zeros_like(feats[int(np.argmax(ok))][0]) for f in feats])
     patch = np.stack([f[1] if f is not None else np.zeros_like(feats[int(np.argmax(ok))][1]) for f in feats])
     elev = np.array([f[2] if f is not None else 0.0 for f in feats], np.float32)
@@ -284,6 +286,6 @@ def recommend(regions: list[dict], start: datetime, days: float, step_hours: flo
         "site_best": region_best,
         "alternatives": alt[:3],
         "explanation": expl,
-        "no_viable": not zones or best[i, j] < ZONE_SUCCESS,
+        "no_viable": bool(not zones or best[i, j] < ZONE_SUCCESS),
         "model": {"version": ai._load()["ck"]["version"]},
     }

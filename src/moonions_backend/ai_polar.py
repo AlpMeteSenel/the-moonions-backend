@@ -101,7 +101,8 @@ def _touchdown():
 
 
 @lru_cache(maxsize=48)
-def success_at(when_iso: str) -> np.ndarray | None:
+def components_at(when_iso: str) -> dict[str, np.ndarray] | None:
+    """Per grid point: AI touchdown safety and the physics checks (light, power, Earth link)."""
     from . import ai
 
     g = _grid()
@@ -109,7 +110,14 @@ def success_at(when_iso: str) -> np.ndarray | None:
     if g is None or td is None:
         return None
     gates = ai.physics_gates(g["lat"], g["lon"], g["elev"], g["horizon"], [datetime.fromisoformat(when_iso)])
-    return (td * (gates["lit0"] * gates["energy_ok"] * gates["comms_ok"])[:, 0]).astype(np.float32)
+    return {"td": td, "lit": gates["lit0"][:, 0], "power": gates["energy_ok"][:, 0], "comms": gates["comms_ok"][:, 0]}
+
+
+def success_at(when_iso: str) -> np.ndarray | None:
+    c = components_at(when_iso)
+    if c is None:
+        return None
+    return (c["td"] * c["lit"] * c["power"] * c["comms"]).astype(np.float32)
 
 
 @lru_cache(maxsize=48)
@@ -174,7 +182,16 @@ def region_summaries(regions: list[dict], when_iso: str) -> list[dict]:
             out.append({"id": r.get("id"), "available": False})
             continue
         s = succ[m]
+        c = components_at(when_iso)
         cell_km2 = (SPACING_M / 1000) ** 2
+        shares = {
+            "terrain": float((c["td"][m] >= 0.9).mean()),
+            "sunlight": float(c["lit"][m].mean()),
+            "power": float(c["power"][m].mean()),
+            "earth_link": float(c["comms"][m].mean()),
+        }
+        # what limits landing here: the check that fails for the largest part of the region
+        limiting = min(shares, key=shares.get)
         out.append(
             {
                 "id": r.get("id"),
@@ -182,6 +199,8 @@ def region_summaries(regions: list[dict], when_iso: str) -> list[dict]:
                 "viable_share": round(float((s >= 0.8).mean()), 4),
                 "viable_km2": round(float((s >= 0.8).sum() * cell_km2), 1),
                 "best_success": round(float(s.max()), 4),
+                "shares": {k: round(v, 3) for k, v in shares.items()},
+                "limiting": limiting,
                 "samples": int(m.sum()),
             }
         )

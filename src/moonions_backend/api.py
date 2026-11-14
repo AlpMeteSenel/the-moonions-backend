@@ -13,7 +13,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import ai, ai_polar, ml_inference, store
+from . import ai, ai_polar, ml_inference, regions, store
 from .backups import suggest_in_region
 from .config import CORS_ORIGINS, TEXTURES
 from .craters import get_craters
@@ -58,6 +58,7 @@ class Point(BaseModel):
     name: str | None = None
     lat: float
     lon: float
+    half_size_m: float | None = Field(None, ge=500, le=20000)
 
 
 class CompareRequest(BaseModel):
@@ -218,8 +219,8 @@ def ai_assess(req: AssessRequest):
 
 @app.post("/api/ai/recommend")
 def ai_recommend(req: RecommendRequest):
-    sites = [{"id": s.id, "name": s.name or s.id, "lat": s.lat, "lon": _norm_lon(s.lon)} for s in req.sites]
-    return ai.recommend(sites, req.start, req.days, req.step_hours, req.divert_radius_m, req.n_backups)
+    sites = [{"id": s.id, "name": s.name or s.id, "lat": s.lat, "lon": _norm_lon(s.lon), "half_size_m": s.half_size_m or 7500.0} for s in req.sites]
+    return regions.recommend(sites, req.start, req.days, req.step_hours)
 
 
 @app.get("/api/ai/site-map")
@@ -239,3 +240,13 @@ def ai_polar_map(time: datetime):
     if data is None:
         raise HTTPException(404, "AI polar map unavailable (model or grid not ready)")
     return Response(data, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/api/regions/analyze")
+def region_analyze(lat: float, lon: float, landing_time: datetime, half_size_m: float = Query(7500.0, ge=500, le=20000), cells: int = Query(61, ge=11, le=101)):
+    return regions.analyze(lat, _norm_lon(lon), half_size_m, landing_time, cells)
+
+
+@app.get("/api/regions/timeline")
+def region_timeline(lat: float, lon: float, start: datetime, half_size_m: float = Query(7500.0, ge=500, le=20000), days: float = Query(30.0, gt=0, le=90), step_hours: float = Query(6.0, ge=1, le=48)):
+    return regions.timeline(lat, _norm_lon(lon), half_size_m, start, days, step_hours)

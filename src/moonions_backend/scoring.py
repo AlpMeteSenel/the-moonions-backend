@@ -97,17 +97,18 @@ def ground_factor(t: TerrainStats, ai: dict | None) -> Factor:
 
 
 def sunlight_factor(sky: dict, hz: Horizon, mission_steps: int) -> Factor:
-    sun_clear = sky["sun_el"] - hz.at(sky["sun_az"])
-    lit = sun_clear > 0.25  # quarter-degree: most of the solar disk above the ridge
+    sun_clear = sky["sun_clear"] if "sun_clear" in sky else sky["sun_el"] - hz.at(sky["sun_az"])
+    lit = sky["lit"] if "lit" in sky else sun_clear > 0.25  # most of the solar disk visible
     el0 = float(sky["sun_el"][0])
     clear0 = float(sun_clear[0])
+    dark0 = not bool(lit[0])
     lit_frac = float(np.mean(lit[:mission_steps])) if mission_steps else float(lit[0])
-    if clear0 <= 0:
+    if dark0:
         angle_q = 0.0
     else:
         angle_q = float(sun_angle_quality(el0))
     score = 100 * (0.55 * angle_q + 0.45 * lit_frac)
-    hard = clear0 <= 0
+    hard = dark0
     if hard:
         msg = "Dark at touchdown: the Sun is behind the horizon or mountains."
     elif el0 < 3.0:
@@ -134,8 +135,8 @@ def sunlight_factor(sky: dict, hz: Horizon, mission_steps: int) -> Factor:
 
 
 def earth_factor(sky: dict, hz: Horizon, mission_steps: int) -> Factor:
-    clear = sky["earth_el"] - hz.at(sky["earth_az"])
-    vis = clear > 0.5
+    clear = sky["earth_clear"] if "earth_clear" in sky else sky["earth_el"] - hz.at(sky["earth_az"])
+    vis = sky["earth_ok"] if "earth_ok" in sky else clear > 0.5
     vis0 = bool(vis[0])
     frac = float(np.mean(vis[:mission_steps])) if mission_steps else float(vis0)
     margin = float(clear[0])
@@ -213,13 +214,15 @@ class EvalParams:
 
 def mission_sky(lat: float, lon: float, p: EvalParams) -> tuple[dict, int]:
     times = time_range(p.landing_time, p.mission_hours, p.step_hours)
-    return sky_from_site(lat, lon, times), len(times)
+    from .conditions import visibility
+
+    return visibility(lat, lon, times), len(times)
 
 
 def evaluate_site(lat: float, lon: float, p: EvalParams, with_backups: bool = True, terrain: TerrainStats | None = None) -> dict:
     terrain = terrain or analyze_zone(lat, lon, p.zone_radius_m)
-    hz = Horizon(lat, lon)
     sky, steps = mission_sky(lat, lon, p)
+    hz = sky["horizon"]
     ai = ml_inference.predict(lat, lon)
     factors = {
         "ground": ground_factor(terrain, ai),
@@ -280,14 +283,15 @@ def timeline(lat: float, lon: float, start: datetime, days: float, step_hours: f
 
     Terrain doesn't change with time, so the time score uses lighting and Earth contact only.
     """
-    hz = Horizon(lat, lon)
+    from .conditions import visibility
+
     total_h = days * 24 + mission_hours
     times = time_range(start, total_h, step_hours)
-    sky = sky_from_site(lat, lon, times)
-    sun_clear = sky["sun_el"] - hz.at(sky["sun_az"])
-    earth_clear = sky["earth_el"] - hz.at(sky["earth_az"])
-    lit = (sun_clear > 0.25).astype(float)
-    vis = (earth_clear > 0.5).astype(float)
+    sky = visibility(lat, lon, times)
+    hz = sky["horizon"]
+    sun_clear, earth_clear = sky["sun_clear"], sky["earth_clear"]
+    lit = sky["lit"].astype(float)
+    vis = sky["earth_ok"].astype(float)
     m = max(1, int(mission_hours / step_hours))
     n = int(days * 24 / step_hours) + 1
     csl = np.concatenate([[0], np.cumsum(lit)])
@@ -296,10 +300,10 @@ def timeline(lat: float, lon: float, start: datetime, days: float, step_hours: f
     lit_frac = (csl[idx + m] - csl[idx]) / m
     vis_frac = (cse[idx + m] - cse[idx]) / m
     el = sky["sun_el"][:n]
-    angle_q = sun_angle_quality(el) * (sun_clear[:n] > 0)
+    angle_q = sun_angle_quality(el) * lit[:n]
     sun_score = 100 * (0.55 * angle_q + 0.45 * lit_frac)
     earth_score = 100 * (0.45 * vis[:n] + 0.55 * vis_frac)
-    score = np.where(sun_clear[:n] > 0, 0.6 * sun_score + 0.4 * earth_score, 0.0)
+    score = np.where(lit[:n] > 0, 0.6 * sun_score + 0.4 * earth_score, 0.0)
 
     windows = []
     good = score >= 60

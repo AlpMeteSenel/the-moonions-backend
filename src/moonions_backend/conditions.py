@@ -77,6 +77,33 @@ def _runs(mask: np.ndarray, step_h: float) -> tuple[float, float]:
     return best * step_h, float(mask.sum() * step_h)
 
 
+def visibility(lat: float, lon: float, times: list[datetime], comm_mask_deg: float = 1.0) -> dict:
+    """The single source of truth for "is the Sun up / is Earth in view" at a site.
+
+    Apparent Sun and Earth positions (JPL DE421, lunar PA frame, light time + aberration;
+    matches JPL Horizons to 1e-4 deg), topocentric from the site's real elevation, against the
+    LOLA terrain skyline at 0.5 deg azimuth steps. The Sun is a finite disk (partly hidden
+    behind ridges, partly covered by Earth during eclipses); Earth counts as in view only when
+    it clears the skyline by the antenna mask. Validated against NASA's LOLA average
+    illumination maps (scripts/validate_illumination.py).
+    """
+    from .dem import get_dem
+
+    hz = Horizon(lat, lon, n_az=720)
+    elev = float(get_dem().elevation(np.array(lat), np.array(lon)))
+    s = {k: v[0] for k, v in sky_many([lat], [lon], body_vectors_km(times), height_m=[elev]).items()}
+    sun_r = angular_radius(SUN_RADIUS_KM, s["sun_dist_km"])
+    earth_r = angular_radius(EARTH_RADIUS_KM, s["earth_dist_km"])
+    s["sun_clear"] = s["sun_el"] - hz.at(s["sun_az"])
+    s["earth_clear"] = s["earth_el"] - hz.at(s["earth_az"])
+    s["eclipsed"] = covered_fraction(s["sun_earth_sep_deg"], sun_r, earth_r)
+    s["sun_frac"] = disk_fraction_above(s["sun_clear"], sun_r) * (1 - s["eclipsed"])  # visible share of the disk
+    s["lit"] = s["sun_frac"] > 0.5  # "sunlit": most of the solar disk visible
+    s["earth_ok"] = s["earth_clear"] >= comm_mask_deg
+    s.update(horizon=hz, elevation_m=elev, sun_radius_deg=sun_r, earth_radius_deg=earth_r, comm_mask_deg=comm_mask_deg)
+    return s
+
+
 def site_conditions(
     lat: float,
     lon: float,
@@ -90,20 +117,10 @@ def site_conditions(
     step_h = step_min / 60.0
     n = int(days * 24 / step_h) + 1
     times = [start + timedelta(hours=step_h * i) for i in range(n)]
-    hz = Horizon(lat, lon, n_az=720)
-    from .dem import get_dem
-
-    elev = float(get_dem().elevation(np.array(lat), np.array(lon)))
-    s = {k: v[0] for k, v in sky_many([lat], [lon], body_vectors_km(times), height_m=[elev]).items()}
-    sun_r = angular_radius(SUN_RADIUS_KM, s["sun_dist_km"])
-    earth_r = angular_radius(EARTH_RADIUS_KM, s["earth_dist_km"])
-    sun_clear = s["sun_el"] - hz.at(s["sun_az"])
-    earth_clear = s["earth_el"] - hz.at(s["earth_az"])
-    above = disk_fraction_above(sun_clear, sun_r)
-    eclipsed = covered_fraction(s["sun_earth_sep_deg"], sun_r, earth_r)
-    sun_frac = above * (1 - eclipsed)  # visible fraction of the solar disk
-    earth_ok = earth_clear >= comm_mask_deg
-    lit = sun_frac > 0.5  # "sunlit": most of the solar disk visible
+    s = visibility(lat, lon, times, comm_mask_deg)
+    hz, sun_r, earth_r = s["horizon"], s["sun_radius_deg"], s["earth_radius_deg"]
+    sun_clear, earth_clear, eclipsed = s["sun_clear"], s["earth_clear"], s["eclipsed"]
+    sun_frac, earth_ok, lit = s["sun_frac"], s["earth_ok"], s["lit"]
 
     t_h = np.arange(n) * step_h
     sun_events = _crossings(t_h, sun_frac, 0.5)
@@ -139,7 +156,7 @@ def site_conditions(
     every = max(1, int(60 / step_min))  # hourly series for charts
     track_every = max(1, int(180 / step_min))
     return {
-        "site": {"lat": lat, "lon": lon, "elevation_m": round(elev, 1)},
+        "site": {"lat": lat, "lon": lon, "elevation_m": round(s["elevation_m"], 1)},
         "start": start.isoformat(),
         "days": days,
         "comm_mask_deg": comm_mask_deg,

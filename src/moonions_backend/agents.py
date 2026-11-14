@@ -27,7 +27,6 @@ import urllib.request
 from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from pathlib import Path
 
 from .ephemeris import to_utc
 from .sites import SITES
@@ -50,14 +49,17 @@ _pool = ThreadPoolExecutor(max_workers=6)
 
 # ----------------------------------------------------------------------------- LLM (optional)
 def _llm_config() -> dict | None:
-    base = os.environ.get("MOONIONS_LLM_BASE_URL", "http://127.0.0.1:8317/v1")
-    key = os.environ.get("MOONIONS_LLM_API_KEY")
-    key_file = Path(os.environ.get("MOONIONS_LLM_KEY_FILE", "~/.config/cliproxyapi/client.key")).expanduser()
-    if not key and key_file.exists():
-        key = key_file.read_text().strip()
-    if not key or os.environ.get("MOONIONS_LLM", "1") == "0":
+    """OpenRouter by default (OPENROUTER_API_KEY in the backend's .env); any OpenAI-compatible
+    endpoint can be used instead via MOONIONS_LLM_BASE_URL + MOONIONS_LLM_API_KEY."""
+    from . import config  # noqa: F401  (loads .env)
+
+    if os.environ.get("MOONIONS_LLM", "1") == "0":
         return None
-    return {"base": base.rstrip("/"), "key": key, "model": os.environ.get("MOONIONS_LLM_MODEL", "gpt-6.1-sol")}
+    key = os.environ.get("MOONIONS_LLM_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
+    if not key:
+        return None
+    base = os.environ.get("MOONIONS_LLM_BASE_URL", "https://openrouter.ai/api/v1")
+    return {"base": base.rstrip("/"), "key": key, "model": os.environ.get("MOONIONS_LLM_MODEL", "openai/gpt-6-luna")}
 
 
 def _llm_json(system: str, user: str, timeout: float = 45.0) -> dict | None:
@@ -72,7 +74,7 @@ def _llm_json(system: str, user: str, timeout: float = 45.0) -> dict | None:
     req = urllib.request.Request(
         cfg["base"] + "/chat/completions",
         data=json.dumps(body).encode(),
-        headers={"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json"},
+        headers={"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json", "X-Title": "Moonions lunar landing navigator"},
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:

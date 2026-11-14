@@ -10,3 +10,4 @@ data/*.sqlite
 data/download.log
 data/*.log
 data/raw/validation/
+.env

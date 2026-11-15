@@ -30,16 +30,47 @@ MAX_ROUNDS = 12
 MAX_CANDIDATES = 16
 
 
-# ----------------------------------------------------------------------------- candidates
-def _candidates(lat: float, lon: float, radius_m: float) -> tuple[list[dict], float]:
-    """Square candidate landing areas tiling the circle (half-size scales with the circle)."""
+# ----------------------------------------------------------------------------- the drawn area
+class Area:
+    """The user's drawn polygon in a local east/north frame (metres) around its centroid."""
+
+    def __init__(self, polygon: list[tuple[float, float]]):
+        from .dem import distance_bearing
+
+        v = np.array([[math.cos(math.radians(a)) * math.cos(math.radians(b)), math.cos(math.radians(a)) * math.sin(math.radians(b)), math.sin(math.radians(a))] for a, b in polygon])
+        c = v.mean(0)
+        c /= np.linalg.norm(c)
+        self.lat, self.lon = math.degrees(math.asin(c[2])), math.degrees(math.atan2(c[1], c[0]))
+        en = []
+        for a, b in polygon:
+            d, brg = distance_bearing(self.lat, self.lon, a, b)
+            en.append((float(d) * math.sin(math.radians(float(brg))), float(d) * math.cos(math.radians(float(brg)))))
+        self.en = np.array(en)
+        self.radius_m = float(np.hypot(self.en[:, 0], self.en[:, 1]).max())
+        x, y = self.en[:, 0], self.en[:, 1]
+        self.area_km2 = abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1)))) / 2e6
+
+    def inside(self, e: float, n: float) -> bool:
+        x, y = self.en[:, 0], self.en[:, 1]
+        hit = False
+        j = len(x) - 1
+        for i in range(len(x)):
+            if (y[i] > n) != (y[j] > n) and e < (x[j] - x[i]) * (n - y[i]) / (y[j] - y[i] + 1e-12) + x[i]:
+                hit = not hit
+            j = i
+        return hit
+
+
+def _candidates(area: Area) -> tuple[list[dict], float]:
+    """Square candidate landing areas tiling the drawn area (half-size scales with its size)."""
     from .dem import offset_latlon
 
-    half = float(np.clip(radius_m / 3.5, 1500.0, 5000.0))
+    lat, lon = area.lat, area.lon
+    half = float(np.clip(math.sqrt(max(area.area_km2, 1.0)) * 1000 / 6.0, 1500.0, 5000.0))
     while True:
         step = 2 * half
-        n = int(radius_m // step)
-        pts = [(e * step, nn * step) for e in range(-n, n + 1) for nn in range(-n, n + 1) if math.hypot(e * step, nn * step) <= max(radius_m - 0.3 * half, 0)]
+        n = int(area.radius_m // step) + 1
+        pts = [(e * step, nn * step) for e in range(-n, n + 1) for nn in range(-n, n + 1) if area.inside(e * step, nn * step)]
         if len(pts) <= MAX_CANDIDATES or half >= 5000:
             break
         half *= 1.25
@@ -62,10 +93,11 @@ def _compass(east: float, north: float) -> str:
 
 # ----------------------------------------------------------------------------- the tools
 class Tools:
-    def __init__(self, lat: float, lon: float, radius_m: float, start: datetime, days: float, stay_hours: float):
-        self.lat, self.lon, self.radius_m = lat, lon, radius_m
+    def __init__(self, area: Area, start: datetime, days: float, stay_hours: float):
+        self.area = area
+        self.lat, self.lon, self.radius_m = area.lat, area.lon, area.radius_m
         self.start, self.days, self.stay_hours = to_utc(start), days, stay_hours
-        self.cands, self.half = _candidates(lat, lon, radius_m)
+        self.cands, self.half = _candidates(area)
         self.by_id = {c["id"]: c for c in self.cands}
 
     def _c(self, cid: str) -> dict:
@@ -92,7 +124,7 @@ class Tools:
                     "id": c["id"],
                     "lat": c["lat"],
                     "lon": c["lon"],
-                    "from_circle_centre": f"{math.hypot(c['east_m'], c['north_m']) / 1000:.1f} km {_compass(c['east_m'], c['north_m'])}",
+                    "from_area_centre": f"{math.hypot(c['east_m'], c['north_m']) / 1000:.1f} km {_compass(c['east_m'], c['north_m'])}",
                     "elevation_m": round(float(dem.elevation(np.array(c["lat"]), np.array(c["lon"]))), 0),
                     "centre_slope_deg": round(s, 1),
                     "faces_deg": round(a, 0),
@@ -130,16 +162,16 @@ class Tools:
         return {"window_days": self.days, "candidates": rows}
 
     def cold_traps(self) -> dict:
-        """Points in the circle that never see the Sun in the window (likely volatiles / ice), with temperatures."""
+        """Points in the drawn area that never see the Sun in the window (likely volatiles / ice), with temperatures."""
         from .conditions import visibility
         from .dem import distance_bearing, offset_latlon
         from .thermal import site_temperature
 
         step_h = 6.0
         times = [self.start + timedelta(hours=step_h * k) for k in range(int(self.days * 24 / step_h) + 1)]
-        n = 7
+        n = 8
         ax = np.linspace(-self.radius_m, self.radius_m, n)
-        pts = [(e, nn) for e in ax for nn in ax if math.hypot(e, nn) <= self.radius_m]
+        pts = [(e, nn) for e in ax for nn in ax if self.area.inside(e, nn)] or [(0.0, 0.0)]
         traps = []
         for e, nn in pts:
             la, lo = offset_latlon(self.lat, self.lon, np.array([e]), np.array([nn]))
@@ -219,13 +251,13 @@ class Tools:
 
 
 TOOL_SPECS = [
-    {"name": "list_candidates", "description": "The candidate landing areas tiling the circled area: position, elevation, slope at the centre.", "parameters": {"type": "object", "properties": {}}},
+    {"name": "list_candidates", "description": "The candidate landing areas tiling the drawn area: position, elevation, slope at the centre.", "parameters": {"type": "object", "properties": {}}},
     {
         "name": "survey",
         "description": "Sunlit share, Earth-in-view share, longest darkness and min/max surface temperature over the planning window at candidate centres (all if no ids).",
         "parameters": {"type": "object", "properties": {"candidate_ids": {"type": "array", "items": {"type": "string"}}}},
     },
-    {"name": "cold_traps", "description": "Sample the circle for ground that never sees the Sun in the window (likely ice/volatiles): location, peak temperature, nearest candidate.", "parameters": {"type": "object", "properties": {}}},
+    {"name": "cold_traps", "description": "Sample the drawn area for ground that never sees the Sun in the window (likely ice/volatiles): location, peak temperature, nearest candidate.", "parameters": {"type": "object", "properties": {}}},
     {
         "name": "landing_timeline",
         "description": "AI landing-success timeline of one candidate area over the window: best time, viable share of the area, landing windows.",
@@ -270,7 +302,7 @@ TOOL_SPECS = [
 ]
 
 SYSTEM = """You are the mission planner of a lunar landing dashboard (NASA LOLA terrain, JPL ephemerides, a trained AI landing-success model).
-The user circled an area of the Moon and described what they want to do there. Research the area with the tools and propose where and when to land.
+The user outlined an area of the Moon and described what they want to do there. Research the area with the tools and propose where and when to land.
 
 Rules:
 - Use only numbers returned by the tools; never invent figures.
@@ -353,9 +385,11 @@ def _rule_based(tools: Tools, emit) -> tuple[list[dict], str]:
     return props, "Ranked by the AI landing timeline only (no language model)."
 
 
-def plan(lat: float, lon: float, radius_m: float, request: str, start: datetime, days: float, stay_hours: float, emit) -> None:
-    tools = Tools(lat, lon, radius_m, start, days, stay_hours)
-    emit("candidates", f"Split the circle into {len(tools.cands)} candidate areas of {2 * tools.half / 1000:.1f} km.", candidates=[{"id": c["id"], "lat": c["lat"], "lon": c["lon"], "half_size_m": tools.half} for c in tools.cands])
+def plan(polygon: list[tuple[float, float]], request: str, start: datetime, days: float, stay_hours: float, emit) -> None:
+    area = Area(polygon)
+    tools = Tools(area, start, days, stay_hours)
+    lat, lon = area.lat, area.lon
+    emit("candidates", f"Split the {area.area_km2:.0f} km² area into {len(tools.cands)} candidate areas of {2 * tools.half / 1000:.1f} km.", candidates=[{"id": c["id"], "lat": c["lat"], "lon": c["lon"], "half_size_m": tools.half} for c in tools.cands])
     cfg = _llm_config()
     summary = ""
     raw: list[dict] = []
@@ -365,7 +399,7 @@ def plan(lat: float, lon: float, radius_m: float, request: str, start: datetime,
         emit("status", f"{cfg['model']} is researching the area…", llm=cfg["model"])
         user = (
             f"Goal: {request.strip() or 'find the best place to land'}\n"
-            f"Circle: centre {lat:.4f}, {lon:.4f}, radius {radius_m / 1000:.1f} km. Planning window: {tools.start.isoformat()} + {days:g} days. "
+            f"Area: {area.area_km2:.0f} km² polygon around {lat:.4f}, {lon:.4f} (up to {area.radius_m / 1000:.1f} km from its centre). Planning window: {tools.start.isoformat()} + {days:g} days. "
             f"Surface stay: {stay_hours:g} h.\nCandidates: " + json.dumps(tools.list_candidates()["candidates"])
         )
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]
@@ -415,7 +449,17 @@ def plan(lat: float, lon: float, radius_m: float, request: str, start: datetime,
     emit("proposals", summary or "Proposals ready.", proposals=proposals)
 
 
-async def stream(lat: float, lon: float, radius_m: float, request: str, start: datetime | None, days: float, stay_hours: float) -> AsyncIterator[str]:
+def circle_polygon(lat: float, lon: float, radius_m: float, n: int = 32) -> list[tuple[float, float]]:
+    from .dem import destination
+
+    out = []
+    for k in range(n):
+        a, b = destination(lat, lon, 360 * k / n, radius_m)
+        out.append((float(a), float(b)))
+    return out
+
+
+async def stream(polygon: list[tuple[float, float]], request: str, start: datetime | None, days: float, stay_hours: float) -> AsyncIterator[str]:
     q: queue.Queue = queue.Queue()
     t_start = time.time()
 
@@ -424,7 +468,7 @@ async def stream(lat: float, lon: float, radius_m: float, request: str, start: d
 
     def run() -> None:
         try:
-            plan(lat, lon, radius_m, request, start or datetime.now(timezone.utc), days, stay_hours, emit)
+            plan(polygon, request, start or datetime.now(timezone.utc), days, stay_hours, emit)
         except Exception as exc:  # noqa: BLE001
             emit("error", f"Planner failed: {exc}")
         finally:

@@ -369,13 +369,24 @@ def site_conditions(
 
 
 class AreaPlanRequest(BaseModel):
-    lat: float = Field(ge=-90, le=90)
-    lon: float = Field(ge=-180, le=360)
-    radius_m: float = Field(ge=1000, le=60000)
+    polygon: list[tuple[float, float]] | None = Field(None, min_length=3, max_length=400, description="[[lat, lon], ...] outline drawn by the user")
+    lat: float | None = Field(None, ge=-90, le=90)
+    lon: float | None = Field(None, ge=-180, le=360)
+    radius_m: float | None = Field(None, ge=1000, le=60000)
     request: str = Field("", max_length=1000)
     start: datetime | None = None
     days: float = Field(30.0, ge=1, le=32)
     stay_hours: float = Field(156.0, ge=12, le=720)
+
+
+def _plan_polygon(req: AreaPlanRequest) -> list[tuple[float, float]]:
+    from . import planner
+
+    if req.polygon:
+        return [(float(a), _norm_lon(float(b))) for a, b in req.polygon]
+    if req.lat is None or req.lon is None or req.radius_m is None:
+        raise HTTPException(422, "send a polygon, or lat/lon/radius_m")
+    return planner.circle_polygon(req.lat, _norm_lon(req.lon), req.radius_m)
 
 
 @app.post("/api/plan/area")
@@ -386,7 +397,7 @@ def plan_area(req: AreaPlanRequest):
     from . import planner
 
     return StreamingResponse(
-        planner.stream(req.lat, _norm_lon(req.lon), req.radius_m, req.request, req.start, req.days, req.stay_hours),
+        planner.stream(_plan_polygon(req), req.request, req.start, req.days, req.stay_hours),
         media_type="application/x-ndjson",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

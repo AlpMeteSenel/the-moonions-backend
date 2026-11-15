@@ -94,13 +94,19 @@ def _pool() -> ProcessPoolExecutor:
 
 
 def shutdown_pool() -> None:
-    """Stop the horizon workers (called on server shutdown/reload so they never outlive it)."""
+    """Stop the horizon workers (called on server shutdown/reload and after an idle spell)."""
     global _POOL
-    if _POOL is not None:
-        _POOL.shutdown(wait=False, cancel_futures=True)
-        for proc in list(getattr(_POOL, "_processes", {}).values()):
+    with _pool_lock:
+        pool, _POOL = _POOL, None  # forget it first: a stopped pool must never be handed out again
+    if pool is None:
+        return
+    procs = list((getattr(pool, "_processes", None) or {}).values())  # read before shutdown clears it
+    pool.shutdown(wait=False, cancel_futures=True)
+    for proc in procs:
+        try:
             proc.terminate()
-        _POOL = None
+        except Exception:  # noqa: BLE001 - already gone
+            pass
 
 
 def _key(lat, lon, half, cells):

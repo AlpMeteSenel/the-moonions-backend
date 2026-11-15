@@ -184,7 +184,7 @@ def main(variants: list[str], epochs: int, batch: int, lr: float):
     phys_ev = evaluate(phys * Y[test, 1:].prod(1), phys, S[test], Y[test, 0], date_idx)
 
     card = {
-        "name": "Moonions mission-success model",
+        "name": "Plan Banana mission-success model",
         "version": ckpts[chosen]["version"],
         "variant": chosen,
         "trained_at": datetime.now(timezone.utc).isoformat(),

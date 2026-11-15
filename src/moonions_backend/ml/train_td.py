@@ -245,7 +245,7 @@ def main(variants, n_seeds, epochs, batch, lr):
     mission["share_of_site_dates_viable"] = float((G > 0).mean())
 
     card = {
-        "name": "Moonions landing-success model",
+        "name": "Plan Banana landing-success model",
         "version": f"td_ensemble_v2_{chosen}",
         "variant": chosen,
         "trained_at": datetime.now(timezone.utc).isoformat(),

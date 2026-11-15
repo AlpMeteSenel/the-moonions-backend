@@ -74,7 +74,7 @@ def _llm_json(system: str, user: str, timeout: float = 45.0) -> dict | None:
     req = urllib.request.Request(
         cfg["base"] + "/chat/completions",
         data=json.dumps(body).encode(),
-        headers={"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json", "X-Title": "Moonions lunar landing navigator"},
+        headers={"Authorization": f"Bearer {cfg['key']}", "Content-Type": "application/json", "X-Title": "Plan Banana lunar landing navigator"},
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import threading
 import atexit
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta
@@ -58,12 +59,38 @@ _POOL: ProcessPoolExecutor | None = None
 POOL_WORKERS = int(os.environ.get("MOONIONS_POOL_WORKERS", "4"))  # each worker holds its own DEM pages
 
 
+_POOL_IDLE_S = 120.0
+_idle_timer: threading.Timer | None = None
+_pool_lock = threading.Lock()
+_busy = 0  # region builds currently using the pool
+
+
+def _idle_shutdown() -> None:
+    with _pool_lock:
+        if _busy > 0:  # still working: check again later
+            _arm_idle_timer()
+            return
+    shutdown_pool()
+
+
+def _arm_idle_timer() -> None:
+    global _idle_timer
+    if _idle_timer is not None:
+        _idle_timer.cancel()
+    _idle_timer = threading.Timer(_POOL_IDLE_S, _idle_shutdown)
+    _idle_timer.daemon = True
+    _idle_timer.start()
+
+
 def _pool() -> ProcessPoolExecutor:
+    """Horizon/feature workers, started on demand and stopped after a quiet spell (each holds GBs)."""
     global _POOL
-    if _POOL is None:
-        _POOL = ProcessPoolExecutor(max_workers=max(1, min(POOL_WORKERS, (os.cpu_count() or 2) - 1)))
-        atexit.register(shutdown_pool)
-    return _POOL
+    with _pool_lock:
+        if _POOL is None:
+            _POOL = ProcessPoolExecutor(max_workers=max(1, min(POOL_WORKERS, (os.cpu_count() or 2) - 1)))
+            atexit.register(shutdown_pool)
+        _arm_idle_timer()
+        return _POOL
 
 
 def shutdown_pool() -> None:
@@ -80,7 +107,7 @@ def _key(lat, lon, half, cells):
     return hashlib.sha1(f"{lat:.6f},{lon:.6f},{half:.1f},{cells},v2".encode()).hexdigest()[:16]
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=8)  # ~35 MB each; the rest reload from the on-disk cache in milliseconds
 def region_grid(lat: float, lon: float, half_size_m: float, cells: int) -> dict:
     """Planning features + horizons for a cells x cells grid over the region (cached on disk)."""
     path = REGION_CACHE / f"{_key(lat, lon, half_size_m, cells)}.npz"
@@ -90,6 +117,17 @@ def region_grid(lat: float, lon: float, half_size_m: float, cells: int) -> dict:
     E, N = np.meshgrid(axis, axis[::-1])  # row 0 = north
     glat, glon = offset_latlon(lat, lon, E.ravel(), N.ravel())
     pts = list(zip(glat.tolist(), glon.tolist()))
+    global _busy
+    with _pool_lock:
+        _busy += 1
+    try:
+        return _region_grid_build(path, lat, lon, half_size_m, cells, E, N, glat, glon, pts)
+    finally:
+        with _pool_lock:
+            _busy -= 1
+
+
+def _region_grid_build(path, lat, lon, half_size_m, cells, E, N, glat, glon, pts) -> dict:
     feats = list(_pool().map(_feat, pts, chunksize=32))
     ok = np.array([f is not None for f in feats])
     if not ok.any():
@@ -114,7 +152,7 @@ def region_grid(lat: float, lon: float, half_size_m: float, cells: int) -> dict:
     return out
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=8)
 def region_touchdown(lat: float, lon: float, half_size_m: float, cells: int):
     from . import ai
 

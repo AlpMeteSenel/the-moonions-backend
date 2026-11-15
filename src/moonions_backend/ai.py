@@ -170,11 +170,17 @@ def physics_gates(lats, lons, elev, horizon, times: list[datetime]) -> dict[str,
     allv = body_vectors_km(stamps)
     keys = ("lit0", "energy_ok", "comms_ok", "lit_frac", "earth_frac", "min_soc", "longest_dark_h", "sun_clear0", "earth_clear0")
     out = {k: np.zeros((len(lats), len(times)), np.float32) for k in keys}
-    for j in range(len(times)):
+    lats, lons, horizon = np.asarray(lats), np.asarray(lons), np.asarray(horizon)
+    elev = np.asarray(elev, dtype=np.float64)
+    if elev.ndim == 0:
+        elev = np.full(len(lats), float(elev))
+    CH = 8192  # sites per chunk: bounds scratch memory for big grids (56k polar points x 79 steps)
+    for j, c0 in ((j, c0) for j in range(len(times)) for c0 in range(0, len(lats), CH)):
+        sl = slice(c0, c0 + CH)
         v = {k: allv[k][j * steps : (j + 1) * steps] for k in allv}
-        s = sky_many(np.asarray(lats), np.asarray(lons), v, height_m=elev)
-        sc = s["sun_el"] - _horizon_at(horizon, s["sun_az"])
-        ec = s["earth_el"] - _horizon_at(horizon, s["earth_az"])
+        s = sky_many(lats[sl], lons[sl], v, height_m=elev[sl])
+        sc = s["sun_el"] - _horizon_at(horizon[sl], s["sun_az"])
+        ec = s["earth_el"] - _horizon_at(horizon[sl], s["earth_az"])
         from .conditions import EARTH_RADIUS_KM, SUN_RADIUS_KM, angular_radius, covered_fraction, disk_fraction_above
 
         sun_r = angular_radius(SUN_RADIUS_KM, s["sun_dist_km"])
@@ -182,7 +188,7 @@ def physics_gates(lats, lons, elev, horizon, times: list[datetime]) -> dict[str,
         o = time_outcomes(sc, s["sun_el"], ec, DEFAULT, sun_frac=frac)
         o["sun_clear0"], o["earth_clear0"] = sc[:, 0], ec[:, 0]
         for k in keys:
-            out[k][:, j] = o[k]
+            out[k][sl, j] = o[k]
     return out
 
 

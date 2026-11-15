@@ -11,6 +11,7 @@ layout as the cap_s_* globe textures.
 from __future__ import annotations
 
 import argparse
+from collections import OrderedDict
 import logging
 import queue
 import threading
@@ -86,7 +87,11 @@ def precompute(workers: int | None = None):
 
 @lru_cache(maxsize=1)
 def _grid():
-    return dict(np.load(GRID)) if GRID.exists() else None
+    """Everything but the terrain patches (344 MB): those are needed once, by _touchdown."""
+    if not GRID.exists():
+        return None
+    with np.load(GRID) as f:
+        return {k: f[k] for k in f.files if k != "patch"}
 
 
 def available() -> bool:
@@ -101,13 +106,37 @@ def _touchdown():
     g = _grid()
     if g is None or ai._load() is None:
         return None
-    td, _ = ai.predict_td(g["tab"], g["patch"].astype(np.float32), g["lat"], g["lon"], variant=ai._fast_variant())
+    with np.load(GRID) as f:
+        patch = f["patch"]  # float16; predict_td converts batch by batch
+    td, _ = ai.predict_td(g["tab"], patch, g["lat"], g["lon"], variant=ai._fast_variant())
+    del patch
     return td.astype(np.float32)
 
 
-@lru_cache(maxsize=48)
+_components: "OrderedDict[str, dict]" = OrderedDict()
+_components_lock = threading.Lock()
+
+
 def components_at(when_iso: str) -> dict[str, np.ndarray] | None:
-    """Per grid point: AI touchdown safety and the physics checks (light, power, Earth link)."""
+    """Per grid point: AI touchdown safety and the physics checks (light, power, Earth link).
+
+    One hour at a time (each needs ~0.3 GB of scratch memory): concurrent requests for the
+    polar map, region colours, prewarm and agents queue here instead of piling up in RAM.
+    """
+    with _components_lock:
+        hit = _components.get(when_iso)
+        if hit is not None:
+            _components.move_to_end(when_iso)
+            return hit
+        out = _components_compute(when_iso)
+        if out is not None:
+            _components[when_iso] = out
+            while len(_components) > 48:
+                _components.popitem(last=False)
+        return out
+
+
+def _components_compute(when_iso: str) -> dict[str, np.ndarray] | None:
     from . import ai
 
     g = _grid()

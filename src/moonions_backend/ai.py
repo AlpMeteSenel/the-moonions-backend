@@ -80,7 +80,35 @@ def model_card() -> dict:
     card = MODELS / "success_model_card.json"
     if card.exists() and available():
         out["success_model"] = json.loads(card.read_text())
+        out["success_model"]["training"] = _training_info()
     return out
+
+
+@lru_cache(maxsize=1)
+def _training_info() -> dict:
+    """How the ensemble was trained (train_td.py defaults) plus parameter counts of the loaded nets."""
+    L = _load()
+    params = {v: int(sum(p.numel() for p in ms[0].parameters())) for v, (ms, _info) in L["models"].items()} if L else {}
+    members = {v: len(ms) for v, (ms, _info) in L["models"].items()} if L else {}
+    return {
+        "optimizer": "AdamW (weight decay 2e-4)",
+        "schedule": "One-cycle learning rate, peak 3e-3",
+        "batch_size": 512,
+        "max_epochs": 60,
+        "early_stopping_patience": 12,
+        "selection": "weights from the epoch with the lowest validation error",
+        "loss": "Binary cross-entropy on [safe touchdown, direct landing] (weights 1.0 / 0.5)",
+        "augmentation": "Random 90° rotations and mirror flips of the terrain patch",
+        "precision": "Mixed precision (fp16) on GPU",
+        "ensemble_members": members,
+        "parameters": params,
+        "architecture": {
+            "terrain_cnn": "3-channel 32×32 patch → stride-2 conv stem → 3 residual blocks (32→64→128 ch) → global pool",
+            "tabular_mlp": "13 features → 128 → 64",
+            "foundation_embedding": "Frozen NASA-IBM Lunar Foundation Model embedding → LayerNorm → 128",
+            "head": "concat → 128 → 2 log-odds corrections, initialised at zero (starts exactly at the physics prior)",
+        },
+    }
 
 
 def _fast_variant() -> str:

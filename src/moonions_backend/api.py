@@ -368,6 +368,30 @@ def site_conditions(
     return conditions.site_conditions(lat, _norm_lon(lon), start, days, step_min, comm_mask_deg, mission_hours)
 
 
+class AreaPlanRequest(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=360)
+    radius_m: float = Field(ge=1000, le=60000)
+    request: str = Field("", max_length=1000)
+    start: datetime | None = None
+    days: float = Field(30.0, ge=1, le=32)
+    stay_hours: float = Field(156.0, ge=12, le=720)
+
+
+@app.post("/api/plan/area")
+def plan_area(req: AreaPlanRequest):
+    """Circle + goal -> an LLM agent researches the area with the backend's tools and proposes landing spots (NDJSON stream)."""
+    from fastapi.responses import StreamingResponse
+
+    from . import planner
+
+    return StreamingResponse(
+        planner.stream(req.lat, _norm_lon(req.lon), req.radius_m, req.request, req.start, req.days, req.stay_hours),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.get("/api/agents/run")
 def agents_run(start: datetime, days: float = Query(14.0, ge=1, le=30), stay_hours: float = Query(156.0, ge=12, le=720)):
     """Run the mission-control agent team; streams one JSON event per line as the agents work."""

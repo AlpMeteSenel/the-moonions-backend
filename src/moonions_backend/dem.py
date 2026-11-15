@@ -57,17 +57,6 @@ def _read_label(path: Path) -> dict[str, str]:
     return out
 
 
-def _img_array(path: Path, meta: dict[str, str]) -> np.memmap:
-    """Reject incomplete/mismatched PDS products before reading terrain values."""
-    if meta["SAMPLE_TYPE"] != "LSB_INTEGER" or int(meta["SAMPLE_BITS"]) != 16:
-        raise ValueError(f"Unsupported PDS sample encoding: {path.name}")
-    shape = int(meta["LINES"]), int(meta["LINE_SAMPLES"])
-    expected = shape[0] * shape[1] * 2
-    if path.stat().st_size != expected:
-        raise ValueError(f"{path.name}: expected {expected} bytes from PDS label, got {path.stat().st_size}")
-    return np.memmap(path, dtype="<i2", mode="r", shape=shape)
-
-
 @dataclass
 class Source:
     name: str
@@ -88,11 +77,11 @@ class CylindricalImg(Source):
         self.lines = int(meta["LINES"])
         self.samples = int(meta["LINE_SAMPLES"])
         self.ppd = float(meta["MAP_RESOLUTION"])
-        self.scale = float(meta["SCALING_FACTOR"])
+        self.scale = float(meta.get("SCALING_FACTOR", 1.0))
         self.line_off = float(meta["LINE_PROJECTION_OFFSET"])
         self.sample_off = float(meta["SAMPLE_PROJECTION_OFFSET"])
         self.center_lon = float(meta["CENTER_LONGITUDE"])
-        self.arr = _img_array(img, meta)
+        self.arr = np.memmap(img, dtype="<i2", mode="r", shape=(self.lines, self.samples))
         super().__init__(name=f"LOLA LDEM_{int(self.ppd)}", resolution_m=float(meta["MAP_SCALE"]))
 
     def covers(self, lat):
@@ -118,7 +107,7 @@ class CylindricalTif(Source):
         h, w = arr.shape
         self.ppd = w / 360.0
         # SVS maps are in km; convert to metres
-        self.scale = 1000.0
+        self.scale = 1000.0 if np.nanmax(np.abs(arr)) < 100 else 1.0
         super().__init__(name=f"SVS LDEM_{int(self.ppd)}", resolution_m=2 * np.pi * MOON_RADIUS_M / w)
 
     def covers(self, lat):
@@ -138,7 +127,7 @@ class PolarImg(Source):
         meta = _read_label(lbl)
         self.lines = int(meta["LINES"])
         self.samples = int(meta["LINE_SAMPLES"])
-        self.scale = float(meta["SCALING_FACTOR"])
+        self.scale = float(meta.get("SCALING_FACTOR", 1.0))
         self.map_scale = float(meta["MAP_SCALE"])
         self.line_off = float(meta["LINE_PROJECTION_OFFSET"])
         self.sample_off = float(meta["SAMPLE_PROJECTION_OFFSET"])
@@ -147,7 +136,7 @@ class PolarImg(Source):
         self.south = self.center_lat < 0
         self.min_abs_lat = float(meta["MAXIMUM_LATITUDE"] if self.south else meta["MINIMUM_LATITUDE"])
         self.min_abs_lat = abs(self.min_abs_lat)
-        self.arr = _img_array(img, meta)
+        self.arr = np.memmap(img, dtype="<i2", mode="r", shape=(self.lines, self.samples))
         pole = "S" if self.south else "N"
         super().__init__(name=f"LOLA polar {pole} {int(self.map_scale)} m", resolution_m=self.map_scale)
 

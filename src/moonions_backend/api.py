@@ -19,7 +19,6 @@ from .config import CORS_ORIGINS, TEXTURES
 from .craters import get_craters
 from .dem import get_dem
 from .ephemeris import sun_and_earth_points
-from .provenance import data_provenance
 from .scoring import FACTOR_LABELS, PROFILES, EvalParams, evaluate_site, timeline
 from .sites import SITES
 from .terrain import terrain_patch
@@ -134,7 +133,6 @@ def health():
         "textures": sorted(p.name for p in TEXTURES.glob("*") if p.is_file()),
         "profiles": PROFILES,
         "factor_labels": FACTOR_LABELS,
-        "data_provenance": data_provenance(),
     }
 
 

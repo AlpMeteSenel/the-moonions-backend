@@ -147,6 +147,32 @@ def sun(time: datetime | None = None):
     return {"time": t.isoformat(), **sun_and_earth_points(t)}
 
 
+@app.get("/api/sun/track")
+def sun_track(start: datetime, hours: int = Query(32 * 24, ge=1, le=24 * 90), step_hours: float = Query(1.0, ge=0.25, le=24)):
+    """Sub-solar / sub-Earth points over a time span, so the dashboard animates lighting locally."""
+    key = [start.isoformat(), hours, step_hours]
+
+    def build():
+        out = []
+        n = int(hours / step_hours) + 1
+        for k in range(n):
+            t = start + timedelta(hours=step_hours * k)
+            p = sun_and_earth_points(t)
+            out.append([round(p["sun_lat"], 4), round(p["sun_lon"], 4), round(p["earth_lat"], 4), round(p["earth_lon"], 4)])
+        return {"start": start.isoformat(), "step_hours": step_hours, "points": out}
+
+    return diskcache.cached_json("sun_track", key, build)
+
+
+@app.post("/api/ai/prewarm")
+def ai_prewarm(start: datetime, hours: int = Query(48, ge=1, le=24 * 32), step_hours: int = Query(1, ge=1, le=24)):
+    """Queue the polar AI map for upcoming hours (timeline playback asks for these next)."""
+    t = start.replace(minute=0, second=0, microsecond=0)
+    for k in range(0, hours + 1, step_hours):
+        ai_polar.prewarm_one(t + timedelta(hours=k))
+    return {"queued": hours // step_hours + 1}
+
+
 @app.post("/api/evaluate")
 def evaluate(req: EvalRequest):
     return evaluate_site(req.lat, _norm_lon(req.lon), req.params())

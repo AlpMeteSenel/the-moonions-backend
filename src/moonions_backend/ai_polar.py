@@ -207,6 +207,18 @@ def prewarm(t: datetime) -> None:
             _warm_q.put(iso)
 
 
+def prewarm_one(t: datetime) -> None:
+    """Queue a single hour (no neighbours)."""
+    global _warm_q
+    if _warm_q is None:
+        _warm_q = queue.Queue()
+        threading.Thread(target=_warm_worker, name="polar-prewarm", daemon=True).start()
+    iso = t.isoformat()
+    if iso not in _warm_seen:
+        _warm_seen.add(iso)
+        _warm_q.put(iso)
+
+
 def region_summaries(regions: list[dict], when_iso: str) -> list[dict]:
     """Fast per-region viable area at a time, from the cached 1.5 km polar AI grid (for map colouring)."""
     from .dem import distance_bearing

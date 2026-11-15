@@ -91,14 +91,23 @@ def hazard():
         s = s[: n_out * f].reshape(n_out, f, out_w, f)
         # 90th percentile-ish: blend mean and max so isolated steep walls still show
         out[r0 // f : r0 // f + n_out] = 0.5 * s.mean(axis=(1, 3)) + 0.5 * s.max(axis=(1, 3))
-    # colour ramp: transparent green-ish (safe) → amber → red (unsafe)
-    t = np.clip(out / 20.0, 0, 1)
-    rgba = np.zeros((out_h, out_w, 4), np.uint8)
-    rgba[..., 0] = (255 * np.clip(t * 2, 0, 1)).astype(np.uint8)
-    rgba[..., 1] = (255 * np.clip(2 - t * 2, 0, 1) * 0.85).astype(np.uint8)
-    rgba[..., 2] = (80 * (1 - t)).astype(np.uint8)
-    rgba[..., 3] = (40 + 200 * np.clip((out - 3) / 15, 0, 1)).astype(np.uint8)
-    Image.fromarray(rgba, "RGBA").save(TEXTURES / "hazard.png", optimize=True)
+    # colour ramp: transparent green-ish (safe) → amber → red (unsafe). The colour depends on the
+    # slope only, so store it as a 256-entry palette PNG (per-entry alpha), visually identical:
+    # same look, a fraction of the size of full RGBA (which was ~30 MB).
+    top = 20.0
+    levels = np.linspace(0, top, 256, dtype=np.float32)  # full 8-bit palette: ~0.08° per step
+    step = float(levels[1] - levels[0])
+    t = np.clip(levels / top, 0, 1)
+    pal = np.zeros((len(levels), 4), np.uint8)
+    pal[:, 0] = (255 * np.clip(t * 2, 0, 1)).astype(np.uint8)
+    pal[:, 1] = (255 * np.clip(2 - t * 2, 0, 1) * 0.85).astype(np.uint8)
+    pal[:, 2] = (80 * (1 - t)).astype(np.uint8)
+    pal[:, 3] = (40 + 200 * np.clip((levels - 3) / 15, 0, 1)).astype(np.uint8)
+    idx = np.clip(np.rint(out / step), 0, len(levels) - 1).astype(np.uint8)
+    img = Image.fromarray(idx, "P")
+    img.putpalette(pal[:, :3].ravel().tolist())
+    img.info["transparency"] = bytes(pal[:, 3].tolist())
+    img.save(TEXTURES / "hazard.png", optimize=True, transparency=bytes(pal[:, 3].tolist()))
     print("hazard ok from", src)
     return {"hazard_source": src, "hazard_max_slope_deg": 20.0}
 

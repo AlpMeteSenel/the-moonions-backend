@@ -209,16 +209,55 @@ def _zones(success: np.ndarray, cells: int, res_m: float, ellipse_m: float, east
 
 def analyze(lat: float, lon: float, half_size_m: float, when: datetime, cells: int = 61) -> dict:
     from . import ai
-    from .backups import compass, divert_cost
-    from .dem import distance_bearing
-    from .ml.simulate import DEFAULT
 
     if ai._load() is None:
         return {"available": False}
     g = region_grid(round(lat, 6), round(lon, 6), float(half_size_m), int(cells))
     td, sd = region_touchdown(round(lat, 6), round(lon, 6), float(half_size_m), int(cells))
     gates = ai.physics_gates(g["lat"], g["lon"], g["elev"], g["horizon"], [when])
-    gate = (gates["lit0"] * gates["energy_ok"] * gates["comms_ok"])[:, 0]
+    frame = _frame(g, td, gates, 0, when, half_size_m, cells)
+    return {**_header(lat, lon, half_size_m, cells), "touchdown": np.round(td, 3).tolist(), "uncertainty": np.round(sd, 3).tolist(), **frame}
+
+
+def analyze_range(lat: float, lon: float, half_size_m: float, start: datetime, hours: int, step_hours: int = 1, cells: int = 61) -> dict:
+    """The same analysis for a block of touchdown times in one go (timeline playback).
+
+    Terrain, touchdown safety and the grid are shared; only light / power / Earth link change with
+    time, and those are computed for all the times at once.
+    """
+    from . import ai
+
+    if ai._load() is None:
+        return {"available": False}
+    g = region_grid(round(lat, 6), round(lon, 6), float(half_size_m), int(cells))
+    td, sd = region_touchdown(round(lat, 6), round(lon, 6), float(half_size_m), int(cells))
+    times = [to_utc(start) + timedelta(hours=step_hours * k) for k in range(int(hours / step_hours) + 1)]
+    gates = ai.physics_gates(g["lat"], g["lon"], g["elev"], g["horizon"], times)
+    frames = [_frame(g, td, gates, j, t, half_size_m, cells) for j, t in enumerate(times)]
+    return {**_header(lat, lon, half_size_m, cells), "touchdown": np.round(td, 3).tolist(), "uncertainty": np.round(sd, 3).tolist(), "frames": frames}
+
+
+def _header(lat, lon, half_size_m, cells) -> dict:
+    from .ml.simulate import DEFAULT
+
+    return {
+        "available": True,
+        "lat": lat,
+        "lon": lon,
+        "half_size_m": half_size_m,
+        "cells": cells,
+        "resolution_m": 2 * half_size_m / (cells - 1),
+        "ellipse_radius_m": 3 * DEFAULT.nav_sigma_m,
+    }
+
+
+def _frame(g, td, gates, j, when, half_size_m, cells) -> dict:
+    """Everything time-dependent about the region at one touchdown time (gates column j)."""
+    from .backups import compass, divert_cost
+    from .dem import distance_bearing
+    from .ml.simulate import DEFAULT
+
+    gate = (gates["lit0"] * gates["energy_ok"] * gates["comms_ok"])[:, j]
     success = td * gate
     res = 2 * half_size_m / (cells - 1)
     ellipse = 3 * DEFAULT.nav_sigma_m
@@ -230,25 +269,16 @@ def analyze(lat: float, lon: float, half_size_m: float, when: datetime, cells: i
             z["from_primary"] = {"distance_m": round(float(d), 0), "direction": compass(float(b)), "decide_by_s": divert_cost(float(d))["decide_by_s"]}
     cell_km2 = (res / 1000) ** 2
     return {
-        "available": True,
-        "lat": lat,
-        "lon": lon,
-        "half_size_m": half_size_m,
-        "cells": cells,
-        "resolution_m": res,
         "landing_time": to_utc(when).isoformat(),
-        "ellipse_radius_m": ellipse,
         "success": np.round(success, 3).tolist(),
-        "touchdown": np.round(td, 3).tolist(),
-        "uncertainty": np.round(sd, 3).tolist(),
         "gate": gate.astype(int).tolist(),
         "stats": {
             "area_km2": round((2 * half_size_m / 1000) ** 2, 1),
             "safe_ground_km2": round(float((td >= SAFE_TD).sum() * cell_km2), 2),
             "safe_ground_share": round(float((td >= SAFE_TD).mean()), 4),
-            "lit_share": round(float(gates["lit0"][:, 0].mean()), 4),
-            "comms_share": round(float(gates["comms_ok"][:, 0].mean()), 4),
-            "power_share": round(float(gates["energy_ok"][:, 0].mean()), 4),
+            "lit_share": round(float(gates["lit0"][:, j].mean()), 4),
+            "comms_share": round(float(gates["comms_ok"][:, j].mean()), 4),
+            "power_share": round(float(gates["energy_ok"][:, j].mean()), 4),
             "viable_share": round(float((success >= ZONE_SUCCESS).mean()), 4),
             "viable_km2": round(float((success >= ZONE_SUCCESS).sum() * cell_km2), 2),
             "best_success": round(float(success.max()), 4),

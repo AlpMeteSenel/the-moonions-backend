@@ -320,6 +320,22 @@ def region_analyze(lat: float, lon: float, landing_time: datetime, half_size_m: 
     return regions.analyze(lat, _norm_lon(lon), half_size_m, landing_time, cells)
 
 
+@app.get("/api/regions/analyze-range")
+def region_analyze_range(
+    lat: float,
+    lon: float,
+    start: datetime,
+    hours: int = Query(24, ge=1, le=96),
+    step_hours: int = Query(1, ge=1, le=24),
+    half_size_m: float = Query(7500.0, ge=500, le=20000),
+    cells: int = Query(61, ge=11, le=101),
+):
+    """Region analysis for a block of hours in one request (timeline playback fetches ahead)."""
+    t = start.replace(minute=0, second=0, microsecond=0)
+    key = [round(lat, 6), _norm_lon(lon), half_size_m, cells, t.isoformat(), hours, step_hours]
+    return diskcache.cached_json("region_range", key, lambda: regions.analyze_range(lat, _norm_lon(lon), half_size_m, t, hours, step_hours, cells))
+
+
 @app.get("/api/regions/timeline")
 def region_timeline(lat: float, lon: float, start: datetime, half_size_m: float = Query(7500.0, ge=500, le=20000), days: float = Query(30.0, gt=0, le=90), step_hours: float = Query(6.0, ge=1, le=48)):
     key = [round(lat, 6), _norm_lon(lon), half_size_m, start.isoformat(), days, step_hours]

@@ -13,7 +13,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import ai, ai_polar, conditions, diskcache, ml_inference, regions, store
+from . import ai, ai_polar, conditions, diskcache, ml_inference, regions, store, tiles
 from .backups import suggest_in_region
 from .config import CORS_ORIGINS, TEXTURES
 from .craters import get_craters
@@ -182,6 +182,20 @@ def get_timeline(
 @app.get("/api/terrain")
 def get_terrain(lat: float, lon: float, half_size_m: float = Query(4000.0, ge=500, le=30000), cells: int = Query(161, ge=33, le=401)):
     return terrain_patch(lat, _norm_lon(lon), half_size_m, cells)
+
+
+@app.get("/api/tiles/info")
+def tiles_info():
+    return tiles.info()
+
+
+@app.get("/api/tiles/{pole}/{z}/{x}/{y}.bin")
+def tile_bin(pole: Literal["s", "n"], z: int, x: int, y: int):
+    """LOLA polar height tile: (128+3)^2 int16 DN (0.5 m) incl. a 1-sample border."""
+    data = tiles.tile(pole, z, x, y)
+    if data is None:
+        raise HTTPException(404, "no such tile")
+    return Response(data, media_type="application/octet-stream", headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @app.get("/api/proposals")

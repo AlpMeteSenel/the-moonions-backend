@@ -1,0 +1,986 @@
+{
+ "generated_at": "2026-11-15T13:39:13.314637+00:00",
+ "search_window": {
+  "start": "2026-11-15T00:00:00+00:00",
+  "days": 32
+ },
+ "method": "Best hour by sqrt(viable share) x best landing spot: 6-hourly region timeline, refined hourly over 24 h. Zones = connected areas where a landing at that hour is predicted to succeed (AI touchdown x sunlight, power and Earth link) that fit the 3-sigma landing ellipse; Z1 is the primary target, the rest are backups.",
+ "regions": [
+  {
+   "id": "mouton-plateau",
+   "name": "Mons Mouton Plateau",
+   "group": "Artemis III region",
+   "centre": {
+    "lat": -84.7,
+    "lon": 31.0,
+    "approximate": true
+   },
+   "region_size_km": 15.0,
+   "optimal_touchdown_utc": "2026-11-21T02:00:00+00:00",
+   "score": 0.8703,
+   "region": {
+    "area_km2": 225.0,
+    "safe_ground_km2": 182.12,
+    "safe_ground_share": 0.7831,
+    "lit_share": 0.9277,
+    "comms_share": 0.9844,
+    "power_share": 0.9113,
+    "viable_share": 0.7576,
+    "viable_km2": 176.19,
+    "best_success": 0.9999,
+    "zones": 2
+   },
+   "zones": [
+    {
+     "lat": -84.71607846031674,
+     "lon": 31.716219381181162,
+     "east_m": 2000.0,
+     "north_m": -500.0,
+     "area_km2": 174.75,
+     "margin_m": 2674.0,
+     "mean_success": 0.9855,
+     "target_success": 0.9997,
+     "fits_ellipse": true,
+     "rank": 1,
+     "id": "Z1"
+    },
+    {
+     "lat": -84.45821290356304,
+     "lon": 32.793086542616265,
+     "east_m": 5250.0,
+     "north_m": 7250.0,
+     "area_km2": 0.938,
+     "margin_m": 250.0,
+     "mean_success": 0.9688,
+     "target_success": 0.9972,
+     "fits_ellipse": true,
+     "rank": 2,
+     "id": "Z2",
+     "from_primary": {
+      "distance_m": 8404.0,
+      "direction": "N",
+      "decide_by_s": 560.0
+     }
+    }
+   ],
+   "centre_conditions": {
+    "sun_up_at_touchdown": true,
+    "earth_in_view_at_touchdown": true,
+    "sun_elevation_deg": 6.77,
+    "next_sunset": {
+     "in_hours": 217.62,
+     "at": "2026-11-30T03:37:21.565606+00:00"
+    },
+    "stay_hours": 156.0,
+    "stay_power_ok": true,
+    "stay_lowest_battery": 1.0,
+    "stay_sunlit_share": 1.0,
+    "stay_earth_share": 1.0,
+    "surface_temp_k": {
+     "now_k": 226.9,
+     "stay_min_k": 197.5,
+     "stay_max_k": 228.4,
+     "period_min_k": 83.1,
+     "period_max_k": 228.4,
+     "slope_deg": 0.4,
+     "aspect_deg": 300.0,
+     "deep_k": 127.5
+    }
+   },
+   "landing_windows": [
+    {
+     "start": "2026-11-15T12:00:00+00:00",
+     "end": "2026-11-27T12:00:00+00:00",
+     "best": "2026-11-18T06:00:00+00:00",
+     "best_success": 0.9998,
+     "hours_open": 288.0
+    },
+    {
+     "start": "2026-12-15T00:00:00+00:00",
+     "end": "2026-12-17T06:00:00+00:00",
+     "best": "2026-12-16T12:00:00+00:00",
+     "best_success": 0.9998,
+     "hours_open": 54.0
+    }
+   ]
+  },
+  {
+   "id": "nobile-rim-2",
+   "name": "Nobile Rim 2",
+   "group": "Artemis III region",
+   "centre": {
+    "lat": -83.9,
+    "lon": 66.0,
+    "approximate": true
+   },
+   "region_size_km": 15.0,
+   "optimal_touchdown_utc": "2026-12-17T09:00:00+00:00",
+   "score": 0.8012,
+   "region": {
+    "area_km2": 225.0,
+    "safe_ground_km2": 171.81,
+    "safe_ground_share": 0.7388,
+    "lit_share": 0.9893,
+    "comms_share": 0.8103,
+    "power_share": 0.9417,
+    "viable_share": 0.642,
+    "viable_km2": 149.31,
+    "best_success": 0.9999,
+    "zones": 2
+   },
+   "zones": [
+    {
+     "lat": -83.71860006551957,
+     "lon": 65.84929450515062,
+     "east_m": -500.0,
+     "north_m": 5500.0,
+     "area_km2": 137.25,
+     "margin_m": 1823.0,
+     "mean_success": 0.9797,
+     "target_success": 0.9994,
+     "fits_ellipse": true,
+     "rank": 1,
+     "id": "Z1"
+    },
+    {
+     "lat": -84.01129977600982,
+     "lon": 68.13406057901463,
+     "east_m": 6750.0,
+     "north_m": -3500.0,
+     "area_km2": 11.375,
+     "margin_m": 573.0,
+     "mean_success": 0.9649,
+     "target_success": 0.9994,
+     "fits_ellipse": true,
+     "rank": 2,
+     "id": "Z2",
+     "from_primary": {
+      "distance_m": 11557.0,
+      "direction": "SE",
+      "decide_by_s": 770.0
+     }
+    }
+   ],
+   "centre_conditions": {
+    "sun_up_at_touchdown": true,
+    "earth_in_view_at_touchdown": false,
+    "sun_elevation_deg": 7.23,
+    "next_sunset": {
+     "in_hours": 146.9,
+     "at": "2026-12-23T11:53:51.488771+00:00"
+    },
+    "stay_hours": 156.0,
+    "stay_power_ok": true,
+    "stay_lowest_battery": 0.871,
+    "stay_sunlit_share": 0.941,
+    "stay_earth_share": 0.946,
+    "surface_temp_k": {
+     "now_k": 273.3,
+     "stay_min_k": 162.3,
+     "stay_max_k": 275.8,
+     "period_min_k": 80.0,
+     "period_max_k": 275.8,
+     "slope_deg": 7.4,
+     "aspect_deg": 358.0,
+     "deep_k": 126.5
+    }
+   },
+   "landing_windows": [
+    {
+     "start": "2026-11-15T18:00:00+00:00",
+     "end": "2026-11-21T06:00:00+00:00",
+     "best": "2026-11-19T00:00:00+00:00",
+     "best_success": 0.9998,
+     "hours_open": 132.0
+    },
+    {
+     "start": "2026-12-14T00:00:00+00:00",
+     "end": "2026-12-17T06:00:00+00:00",
+     "best": "2026-12-17T00:00:00+00:00",
+     "best_success": 0.9998,
+     "hours_open": 78.0
+    }
+   ]
+  },
+  {
+   "id": "mouton",
+   "name": "Mons Mouton",
+   "group": "Artemis III region",
+   "centre": {
+    "lat": -85.3,
+    "lon": 35.5,
+    "approximate": true
+   },
+   "region_size_km": 15.0,
+   "optimal_touchdown_utc": "2026-11-19T22:00:00+00:00",
+   "score": 0.4694,
+   "region": {
+    "area_km2": 225.0,
+    "safe_ground_km2": 85.94,
+    "safe_ground_share": 0.3695,
+    "lit_share": 0.4789,
+    "comms_share": 0.7143,
+    "power_share": 0.4077,
+    "viable_share": 0.2204,
+    "viable_km2": 51.25,
+    "best_success": 0.9998,
+    "zones": 5
+   },
+   "zones": [
+    {
+     "lat": -85.10013225863915,
+     "lon": 37.14110966868418,
+     "east_m": 4250.0,
+     "north_m": 6000.0,
+     "area_km2": 25.562,
+     "margin_m": 1500.0,
+     "mean_success": 0.9848,
+     "target_success": 0.9614,
+     "fits_ellipse": true,
+     "rank": 1,
+     "id": "Z1"
+    },
+    {
+     "lat": -85.11356011834198,
+     "lon": 32.88584021951263,
+     "east_m": -6750.0,
+     "north_m": 5500.0,
+     "area_km2": 12.875,
+     "margin_m": 725.0,
+     "mean_success": 0.9756,
+     "target_success": 0.9994,
+     "fits_ellipse": true,
+     "rank": 2,
+     "id": "Z2",
+     "from_primary": {
+      "distance_m": 11011.0,
+      "direction": "W",
+      "decide_by_s": 734.0
+     }
+    },
+    {
+     "lat": -85.07684133033493,
+     "lon": 34.6353627427514,
+     "east_m": -2250.0,
+     "north_m": 6750.0,
+     "area_km2": 7.0,
+     "margin_m": 750.0,
+     "mean_success": 0.9714,
+     "target_success": 0.9699,
+     "fits_ellipse": true,
+     "rank": 3,
+     "id": "Z3",
+     "from_primary": {
+      "distance_m": 6543.0,
+      "direction": "W",
+      "decide_by_s": 436.0
+     }
+    },
+    {
+     "lat": -85.38056514119725,
+     "lon": 33.861879538285564,
+     "east_m": -4000.0,
+     "north_m": -2500.0,
+     "area_km2": 2.0,
+     "margin_m": 382.0,
+     "mean_success": 0.9778,
+     "target_success": 0.9988,
+     "fits_ellipse": true,
+     "rank": 4,
+     "id": "Z4",
+     "from_primary": {
+      "distance_m": 11845.0,
+      "direction": "SW",
+      "decide_by_s": 790.0
+     }
+    },
+    {
+     "lat": -85.52781126142247,
+     "lon": 37.61511155338428,
+     "east_m": 5000.0,
+     "north_m": -7000.0,
+     "area_km2": 1.438,
+     "margin_m": 323.0,
+     "mean_success": 0.9752,
+     "target_success": 0.9988,
+     "fits_ellipse": true,
+     "rank": 5,
+     "id": "Z5",
+     "from_primary": {
+      "distance_m": 13022.0,
+      "direction": "S",
+      "decide_by_s": 868.0
+     }
+    }
+   ],
+   "centre_conditions": {
+    "sun_up_at_touchdown": false,
+    "earth_in_view_at_touchdown": true,
+    "sun_elevation_deg": 5.98,
+    "next_sunset": {
+     "in_hours": 245.46,
+     "at": "2026-11-30T03:27:43.445194+00:00"
+    },
+    "stay_hours": 156.0,
+    "stay_power_ok": true,
+    "stay_lowest_battery": 0.218,
+    "stay_sunlit_share": 0.741,
+    "stay_earth_share": 1.0,
+    "surface_temp_k": {
+     "now_k": 78.3,
+     "stay_min_k": 78.1,
+     "stay_max_k": 241.0,
+     "period_min_k": 78.1,
+     "period_max_k": 265.6,
+     "slope_deg": 13.7,
+     "aspect_deg": 232.0,
+     "deep_k": 124.8
+    }
+   },
+   "landing_windows": [
+    {
+     "start": "2026-11-15T00:00:00+00:00",
+     "end": "2026-11-28T00:00:00+00:00",
+     "best": "2026-11-20T18:00:00+00:00",
+     "best_success": 0.9996,
+     "hours_open": 312.0
+    },
+    {
+     "start": "2026-12-11T06:00:00+00:00",
+     "end": "2026-12-17T06:00:00+00:00",
+     "best": "2026-12-16T18:00:00+00:00",
+     "best_success": 0.9993,
+     "hours_open": 144.0
+    }
+   ]
+  },
+  {
+   "id": "shackleton-ridge",
+   "name": "Shackleton connecting ridge",
+   "group": "South pole",
+   "centre": {
+    "lat": -89.45,
+    "lon": -137.0,
+    "approximate": true
+   },
+   "region_size_km": 10.0,
+   "optimal_touchdown_utc": "2026-11-20T03:00:00+00:00",
+   "score": 0.3623,
+   "region": {
+    "area_km2": 100.0,
+    "safe_ground_km2": 42.81,
+    "safe_ground_share": 0.4141,
+    "lit_share": 0.3701,
+    "comms_share": 0.5477,
+    "power_share": 0.3805,
+    "viable_share": 0.1314,
+    "viable_km2": 13.58,
+    "best_success": 0.9994,
+    "zones": 3
+   },
+   "zones": [
+    {
+     "lat": -89.52769671420906,
+     "lon": -122.16583426463956,
+     "east_m": 3666.666666666666,
+     "north_m": -2833.3333333333335,
+     "area_km2": 11.361,
+     "margin_m": 936.0,
+     "mean_success": 0.9805,
+     "target_success": 0.9969,
+     "fits_ellipse": true,
+     "rank": 1,
+     "id": "Z1"
+    },
+    {
+     "lat": -89.55958796683724,
+     "lon": -146.33697411196863,
+     "east_m": -2166.666666666667,
+     "north_m": -3500.0,
+     "area_km2": 1.361,
+     "margin_m": 255.0,
+     "mean_success": 0.9745,
+     "target_success": 0.9961,
+     "fits_ellipse": true,
+     "rank": 2,
+     "id": "Z2",
+     "from_primary": {
+      "distance_m": 5871.0,
+      "direction": "W",
+      "decide_by_s": 391.0
+     }
+    },
+    {
+     "lat": -89.44999999999986,
+     "lon": -137.0,
+     "east_m": 0.0,
+     "north_m": 0.0,
+     "area_km2": 0.861,
+     "margin_m": 215.0,
+     "mean_success": 0.9841,
+     "target_success": 0.999,
+     "fits_ellipse": true,
+     "rank": 3,
+     "id": "Z3",
+     "from_primary": {
+      "distance_m": 4634.0,
+      "direction": "NW",
+      "decide_by_s": 309.0
+     }
+    }
+   ],
+   "centre_conditions": {
+    "sun_up_at_touchdown": true,
+    "earth_in_view_at_touchdown": true,
+    "sun_elevation_deg": 1.0,
+    "next_sunset": null,
+    "stay_hours": 156.0,
+    "stay_power_ok": true,
+    "stay_lowest_battery": 1.0,
+    "stay_sunlit_share": 1.0,
+    "stay_earth_share": 1.0,
+    "surface_temp_k": {
+     "now_k": 124.7,
+     "stay_min_k": 124.7,
+     "stay_max_k": 177.8,
+     "period_min_k": 124.7,
+     "period_max_k": 184.7,
+     "slope_deg": 1.4,
+     "aspect_deg": 90.0,
+     "deep_k": 144.7
+    }
+   },
+   "landing_windows": [
+    {
+     "start": "2026-11-16T12:00:00+00:00",
+     "end": "2026-11-26T00:00:00+00:00",
+     "best": "2026-11-20T00:00:00+00:00",
+     "best_success": 0.9991,
+     "hours_open": 228.0
+    },
+    {
+     "start": "2026-12-13T18:00:00+00:00",
+     "end": "2026-12-17T06:00:00+00:00",
+     "best": "2026-12-14T06:00:00+00:00",
+     "best_success": 0.9977,
+     "hours_open": 84.0
+    }
+   ]
+  },
+  {
+   "id": "malapert",
+   "name": "Malapert Massif",
+   "group": "Artemis III region",
+   "centre": {
+    "lat": -85.95,
+    "lon": 2.5,
+    "approximate": true
+   },
+   "region_size_km": 15.0,
+   "optimal_touchdown_utc": "2026-11-22T20:00:00+00:00",
+   "score": 0.3413,
+   "region": {
+    "area_km2": 225.0,
+    "safe_ground_km2": 26.38,
+    "safe_ground_share": 0.1134,
+    "lit_share": 0.6676,
+    "comms_share": 0.6807,
+    "power_share": 0.5257,
+    "viable_share": 0.1166,
+    "viable_km2": 27.12,
+    "best_success": 0.9996,
+    "zones": 2
+   },
+   "zones": [
+    {
+     "lat": -85.97469969874201,
+     "lon": 2.265103967142977,
+     "east_m": -500.0,
+     "north_m": -750.0,
+     "area_km2": 22.0,
+     "margin_m": 854.0,
+     "mean_success": 0.9641,
+     "target_success": 0.996,
+     "fits_ellipse": true,
+     "rank": 1,
+     "id": "Z1"
+    },
+    {
+     "lat": -85.80918815204072,
+     "lon": 3.5154049927458857,
+     "east_m": 2250.0,
+     "north_m": 4250.0,
+     "area_km2": 3.125,
+     "margin_m": 530.0,
+     "mean_success": 0.9585,
+     "target_success": 0.9967,
+     "fits_ellipse": true,
+     "rank": 2,
+     "id": "Z2",
+     "from_primary": {
+      "distance_m": 5706.0,
+      "direction": "NE",
+      "decide_by_s": 380.0
+     }
+    }
+   ],
+   "centre_conditions": {
+    "sun_up_at_touchdown": true,
+    "earth_in_view_at_touchdown": true,
+    "sun_elevation_deg": 5.41,
+    "next_sunset": {
+     "in_hours": 210.39,
+     "at": "2026-12-01T14:23:06.566448+00:00"
+    },
+    "stay_hours": 156.0,
+    "stay_power_ok": true,
+    "stay_lowest_battery": 1.0,
+    "stay_sunlit_share": 1.0,
+    "stay_earth_share": 1.0,
+    "surface_temp_k": {
+     "now_k": 272.0,
+     "stay_min_k": 213.4,
+     "stay_max_k": 272.3,
+     "period_min_k": 86.1,
+     "period_max_k": 272.3,
+     "slope_deg": 8.8,
+     "aspect_deg": 17.0,
+     "deep_k": 150.0
+    }
+   },
+   "landing_windows": [
+    {
+     "start": "2026-11-15T00:00:00+00:00",
+     "end": "2026-11-28T06:00:00+00:00",
+     "best": "2026-11-20T00:00:00+00:00",
+     "best_success": 0.9987,
+     "hours_open": 318.0
+    },
+    {
+     "start": "2026-12-13T06:00:00+00:00",
+     "end": "2026-12-17T06:00:00+00:00",
+     "best": "2026-12-16T18:00:00+00:00",
+     "best_success": 0.998,
+     "hours_open": 96.0
+    }
+   ]
+  },
+  {
+   "id": "nobile-rim-1",
+   "name": "Nobile Rim 1",
+   "group": "Artemis III region",
+   "centre": {
+    "lat": -84.3,
+    "lon": 60.0,
+    "approximate": true
+   },
+   "region_size_km": 15.0,
+   "optimal_touchdown_utc": "2026-12-17T05:00:00+00:00",
+   "score": 0.3245,
+   "region": {
+    "area_km2": 225.0,
+    "safe_ground_km2": 56.0,
+    "safe_ground_share": 0.2408,
+    "lit_share": 0.3249,
+    "comms_share": 0.4894,
+    "power_share": 0.3066,
+    "viable_share": 0.1053,
+    "viable_km2": 24.5,
+    "best_success": 0.9999,
+    "zones": 2
+   },
+   "zones": [
+    {
+     "lat": -84.12677381766767,
+     "lon": 59.677721623770594,
+     "east_m": -1000.0,
+     "north_m": 5250.0,
+     "area_km2": 19.688,
+     "margin_m": 941.0,
+     "mean_success": 0.968,
+     "target_success": 0.9992,
+     "fits_ellipse": true,
+     "rank": 1,
+     "id": "Z1"
+    },
+    {
+     "lat": -84.25617631246598,
+     "lon": 61.73020129119698,
+     "east_m": 5250.0,
+     "north_m": 1250.0,
+     "area_km2": 4.75,
+     "margin_m": 382.0,
+     "mean_success": 0.964,
+     "target_success": 0.9994,
+     "fits_ellipse": true,
+     "rank": 2,
+     "id": "Z2",
+     "from_primary": {
+      "distance_m": 7420.0,
+      "direction": "SE",
+      "decide_by_s": 495.0
+     }
+    }
+   ],
+   "centre_conditions": {
+    "sun_up_at_touchdown": false,
+    "earth_in_view_at_touchdown": false,
+    "sun_elevation_deg": 6.59,
+    "next_sunset": null,
+    "stay_hours": 156.0,
+    "stay_power_ok": false,
+    "stay_lowest_battery": 0.0,
+    "stay_sunlit_share": 0.0,
+    "stay_earth_share": 0.0,
+    "surface_temp_k": {
+     "now_k": 48.6,
+     "stay_min_k": 48.6,
+     "stay_max_k": 48.6,
+     "period_min_k": 48.6,
+     "period_max_k": 48.6,
+     "slope_deg": 11.1,
+     "aspect_deg": 171.0,
+     "deep_k": 48.6
+    }
+   },
+   "landing_windows": [
+    {
+     "start": "2026-11-15T00:00:00+00:00",
+     "end": "2026-11-22T00:00:00+00:00",
+     "best": "2026-11-17T06:00:00+00:00",
+     "best_success": 0.9994,
+     "hours_open": 168.0
+    },
+    {
+     "start": "2026-12-12T12:00:00+00:00",
+     "end": "2026-12-17T06:00:00+00:00",
+     "best": "2026-12-16T12:00:00+00:00",
+     "best_success": 0.9994,
+     "hours_open": 114.0
+    }
+   ]
+  },
+  {
+   "id": "de-gerlache-rim-2",
+   "name": "de Gerlache Rim 2",
+   "group": "Artemis III region",
+   "centre": {
+    "lat": -88.6,
+    "lon": -66.0,
+    "approximate": true
+   },
+   "region_size_km": 15.0,
+   "optimal_touchdown_utc": "2026-11-21T09:00:00+00:00",
+   "score": 0.2761,
+   "region": {
+    "area_km2": 225.0,
+    "safe_ground_km2": 32.62,
+    "safe_ground_share": 0.1403,
+    "lit_share": 0.548,
+    "comms_share": 0.5778,
+    "power_share": 0.4832,
+    "viable_share": 0.0763,
+    "viable_km2": 17.75,
+    "best_success": 0.9996,
+    "zones": 3
+   },
+   "zones": [
+    {
+     "lat": -88.72923483350219,
+     "lon": -62.279850296014274,
+     "east_m": 2500.0,
+     "north_m": -4000.0,
+     "area_km2": 5.125,
+     "margin_m": 823.0,
+     "mean_success": 0.9456,
+     "target_success": 0.9961,
+     "fits_ellipse": true,
+     "rank": 1,
+     "id": "Z1"
+    },
+    {
+     "lat": -88.41688214501167,
+     "lon": -63.313243493479135,
+     "east_m": 2250.0,
+     "north_m": 5500.0,
+     "area_km2": 3.75,
+     "margin_m": 382.0,
+     "mean_success": 0.9621,
+     "target_success": 0.9984,
+     "fits_ellipse": true,
+     "rank": 2,
+     "id": "Z2",
+     "from_primary": {
+      "distance_m": 9503.0,
+      "direction": "N",
+      "decide_by_s": 634.0
+     }
+    },
+    {
+     "lat": -88.34473752393234,
+     "lon": -57.982242326584185,
+     "east_m": 7000.0,
+     "north_m": 7250.0,
+     "area_km2": 1.062,
+     "margin_m": 250.0,
+     "mean_success": 0.9443,
+     "target_success": 0.9973,
+     "fits_ellipse": true,
+     "rank": 3,
+     "id": "Z3",
+     "from_primary": {
+      "distance_m": 12117.0,
+      "direction": "N",
+      "decide_by_s": 808.0
+     }
+    }
+   ],
+   "centre_conditions": {
+    "sun_up_at_touchdown": true,
+    "earth_in_view_at_touchdown": true,
+    "sun_elevation_deg": 1.23,
+    "next_sunset": {
+     "in_hours": 203.28,
+     "at": "2026-11-29T20:16:46.140575+00:00"
+    },
+    "stay_hours": 156.0,
+    "stay_power_ok": true,
+    "stay_lowest_battery": 1.0,
+    "stay_sunlit_share": 1.0,
+    "stay_earth_share": 1.0,
+    "surface_temp_k": {
+     "now_k": 289.3,
+     "stay_min_k": 216.4,
+     "stay_max_k": 289.4,
+     "period_min_k": 85.2,
+     "period_max_k": 289.4,
+     "slope_deg": 17.0,
+     "aspect_deg": 105.0,
+     "deep_k": 146.7
+    }
+   },
+   "landing_windows": [
+    {
+     "start": "2026-11-15T00:00:00+00:00",
+     "end": "2026-11-26T18:00:00+00:00",
+     "best": "2026-11-21T12:00:00+00:00",
+     "best_success": 0.9983,
+     "hours_open": 282.0
+    },
+    {
+     "start": "2026-12-14T06:00:00+00:00",
+     "end": "2026-12-17T06:00:00+00:00",
+     "best": "2026-12-16T18:00:00+00:00",
+     "best_success": 0.9982,
+     "hours_open": 72.0
+    }
+   ]
+  },
+  {
+   "id": "haworth",
+   "name": "Haworth",
+   "group": "Artemis III region",
+   "centre": {
+    "lat": -86.9,
+    "lon": -9.0,
+    "approximate": true
+   },
+   "region_size_km": 15.0,
+   "optimal_touchdown_utc": "2026-11-23T23:00:00+00:00",
+   "score": 0.1571,
+   "region": {
+    "area_km2": 225.0,
+    "safe_ground_km2": 17.19,
+    "safe_ground_share": 0.0739,
+    "lit_share": 0.0333,
+    "comms_share": 0.0551,
+    "power_share": 0.032,
+    "viable_share": 0.0247,
+    "viable_km2": 5.75,
+    "best_success": 0.9996,
+    "zones": 1
+   },
+   "zones": [
+    {
+     "lat": -86.67049862849952,
+     "lon": -12.69336954871929,
+     "east_m": -6500.0,
+     "north_m": 6750.0,
+     "area_km2": 5.75,
+     "margin_m": 725.0,
+     "mean_success": 0.9898,
+     "target_success": 0.944,
+     "fits_ellipse": true,
+     "rank": 1,
+     "id": "Z1"
+    }
+   ],
+   "centre_conditions": {
+    "sun_up_at_touchdown": false,
+    "earth_in_view_at_touchdown": false,
+    "sun_elevation_deg": 4.53,
+    "next_sunset": null,
+    "stay_hours": 156.0,
+    "stay_power_ok": false,
+    "stay_lowest_battery": 0.0,
+    "stay_sunlit_share": 0.0,
+    "stay_earth_share": 0.0,
+    "surface_temp_k": {
+     "now_k": 63.9,
+     "stay_min_k": 58.4,
+     "stay_max_k": 63.9,
+     "period_min_k": 57.1,
+     "period_max_k": 63.9,
+     "slope_deg": 11.8,
+     "aspect_deg": 138.0,
+     "deep_k": 63.9
+    }
+   },
+   "landing_windows": [
+    {
+     "start": "2026-11-23T18:00:00+00:00",
+     "end": "2026-11-25T06:00:00+00:00",
+     "best": "2026-11-24T00:00:00+00:00",
+     "best_success": 0.9986,
+     "hours_open": 36.0
+    }
+   ]
+  },
+  {
+   "id": "slater-plain",
+   "name": "Slater Plain",
+   "group": "Artemis III region",
+   "centre": {
+    "lat": -87.9,
+    "lon": 113.0,
+    "approximate": true
+   },
+   "region_size_km": 15.0,
+   "optimal_touchdown_utc": "2026-12-15T17:00:00+00:00",
+   "score": 0.1503,
+   "region": {
+    "area_km2": 225.0,
+    "safe_ground_km2": 104.25,
+    "safe_ground_share": 0.4483,
+    "lit_share": 0.0946,
+    "comms_share": 0.5004,
+    "power_share": 0.0529,
+    "viable_share": 0.0226,
+    "viable_km2": 5.25,
+    "best_success": 0.9997,
+    "zones": 2
+   },
+   "zones": [
+    {
+     "lat": -87.67789198773032,
+     "lon": 108.31475740191445,
+     "east_m": -5750.0,
+     "north_m": 6500.0,
+     "area_km2": 2.062,
+     "margin_m": 323.0,
+     "mean_success": 0.9906,
+     "target_success": 0.9994,
+     "fits_ellipse": true,
+     "rank": 1,
+     "id": "Z1"
+    },
+    {
+     "lat": -87.66902363148057,
+     "lon": 113.60812886045414,
+     "east_m": 750.0,
+     "north_m": 7000.0,
+     "area_km2": 1.312,
+     "margin_m": 323.0,
+     "mean_success": 0.9604,
+     "target_success": 0.9776,
+     "fits_ellipse": true,
+     "rank": 2,
+     "id": "Z2",
+     "from_primary": {
+      "distance_m": 6519.0,
+      "direction": "E",
+      "decide_by_s": 435.0
+     }
+    }
+   ],
+   "centre_conditions": {
+    "sun_up_at_touchdown": false,
+    "earth_in_view_at_touchdown": false,
+    "sun_elevation_deg": 3.41,
+    "next_sunset": null,
+    "stay_hours": 156.0,
+    "stay_power_ok": false,
+    "stay_lowest_battery": 0.0,
+    "stay_sunlit_share": 0.0,
+    "stay_earth_share": 0.585,
+    "surface_temp_k": {
+     "now_k": 48.6,
+     "stay_min_k": 48.6,
+     "stay_max_k": 48.6,
+     "period_min_k": 48.6,
+     "period_max_k": 48.6,
+     "slope_deg": 8.0,
+     "aspect_deg": 171.0,
+     "deep_k": 48.6
+    }
+   },
+   "landing_windows": [
+    {
+     "start": "2026-12-15T12:00:00+00:00",
+     "end": "2026-12-17T00:00:00+00:00",
+     "best": "2026-12-16T00:00:00+00:00",
+     "best_success": 0.9987,
+     "hours_open": 36.0
+    }
+   ]
+  },
+  {
+   "id": "cabeus-b-peak",
+   "name": "Peak near Cabeus B",
+   "group": "Artemis III region",
+   "centre": {
+    "lat": -84.6,
+    "lon": -46.0,
+    "approximate": true
+   },
+   "region_size_km": 15.0,
+   "optimal_touchdown_utc": "2026-11-15T00:00:00+00:00",
+   "score": 0.0,
+   "region": {
+    "area_km2": 225.0,
+    "safe_ground_km2": 168.25,
+    "safe_ground_share": 0.7235,
+    "lit_share": 0.0,
+    "comms_share": 0.0,
+    "power_share": 0.0,
+    "viable_share": 0.0,
+    "viable_km2": 0.0,
+    "best_success": 0.0,
+    "zones": 0
+   },
+   "zones": [],
+   "centre_conditions": {
+    "sun_up_at_touchdown": false,
+    "earth_in_view_at_touchdown": false,
+    "sun_elevation_deg": -3.53,
+    "next_sunset": null,
+    "stay_hours": 156.0,
+    "stay_power_ok": false,
+    "stay_lowest_battery": 0.0,
+    "stay_sunlit_share": 0.0,
+    "stay_earth_share": 0.0,
+    "surface_temp_k": {
+     "now_k": 48.6,
+     "stay_min_k": 48.6,
+     "stay_max_k": 48.6,
+     "period_min_k": 48.6,
+     "period_max_k": 48.6,
+     "slope_deg": 13.5,
+     "aspect_deg": 129.0,
+     "deep_k": 48.6
+    }
+   },
+   "landing_windows": []
+  }
+ ]
+}

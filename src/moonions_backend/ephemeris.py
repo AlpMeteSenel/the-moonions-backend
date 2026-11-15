@@ -30,6 +30,10 @@ class Ephem:
 
 @lru_cache(maxsize=1)
 def get_ephem() -> Ephem:
+    required = ("de421.bsp", "moon_080317.tf", "pck00011.tpc", "moon_pa_de421_1900-2050.bpc")
+    missing = [name for name in required if not (RAW / name).is_file() or (RAW / name).stat().st_size == 0]
+    if missing:
+        raise FileNotFoundError(f"Required JPL/NAIF kernels missing: {', '.join(missing)}. Run scripts/download_data.sh.")
     load = Loader(str(RAW), verbose=False)
     ts = load.timescale(builtin=True)
     eph = load("de421.bsp")

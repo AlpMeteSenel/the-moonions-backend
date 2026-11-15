@@ -157,6 +157,12 @@ def site_conditions(
     track_every = max(1, int(180 / step_min))
     return {
         "site": {"lat": lat, "lon": lon, "elevation_m": round(s["elevation_m"], 1)},
+        "power_model": {
+            "source": "simulation", "vehicle_verified": False,
+            "battery_kwh": p.battery_kwh, "panel_kw": p.panel_kw, "load_kw": p.load_kw,
+            "initial_battery_fraction": 1.0,
+            "panel_orientation": "Vertical panels tracking the Sun in azimuth",
+        },
         "start": start.isoformat(),
         "days": days,
         "comm_mask_deg": comm_mask_deg,

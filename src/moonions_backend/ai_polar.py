@@ -11,6 +11,9 @@ layout as the cap_s_* globe textures.
 from __future__ import annotations
 
 import argparse
+import logging
+import queue
+import threading
 import io
 import os
 from datetime import datetime, timedelta
@@ -20,6 +23,8 @@ from multiprocessing import Pool
 import numpy as np
 
 from .config import CACHE, MOON_RADIUS_M
+
+log = logging.getLogger(__name__)
 
 GRID = CACHE / "ai_polar_grid.npz"
 SPACING_M = 1500.0
@@ -141,13 +146,20 @@ def png(when_iso: str) -> bytes | None:
     num = uniform_filter(np.where(valid, val, 0.0), 3)
     den = uniform_filter(valid.astype(np.float32), 3)
     val = np.where(~valid & (den > 0.2), num / np.maximum(den, 1e-6), val)
-    ramp = np.array([[13, 54, 107], [16, 66, 129], [24, 79, 149], [28, 92, 171], [37, 106, 191], [42, 120, 214], [57, 135, 229], [85, 152, 231], [109, 167, 236], [134, 182, 239], [158, 197, 244], [183, 211, 246], [205, 226, 251]], np.float32)
-    t = np.clip(np.nan_to_num(val, nan=0), 0, 1) * (len(ramp) - 1)
-    i0 = np.minimum(t.astype(int), len(ramp) - 2)
-    f = (t - i0)[..., None]
-    rgb = ramp[i0] * (1 - f) + ramp[i0 + 1] * f
-    # low success fades out so the terrain shows through; high success is opaque
-    alpha = np.where(np.isnan(val), 0, 25 + 200 * np.clip(np.nan_to_num(val, nan=0), 0, 1) ** 1.5).astype(np.uint8)
+    # light NaN-aware smoothing: reads as areas instead of grid speckle
+    from scipy.ndimage import gaussian_filter
+
+    ok = ~np.isnan(val)
+    sm = gaussian_filter(np.where(ok, val, 0.0), 0.9) / np.maximum(gaussian_filter(ok.astype(np.float32), 0.9), 1e-6)
+    val = np.where(ok, sm, np.nan)
+    # landing-success encoding shared with the frontend (palette.ts LAND_STOPS): nothing below
+    # 30 % (the bare terrain means "no"), then one green that gets stronger and brighter
+    stops = np.array([0.3, 0.5, 0.7, 0.85, 1.0], np.float32)
+    cols = np.array([[6, 95, 70], [5, 150, 105], [16, 185, 129], [52, 211, 153], [167, 243, 208]], np.float32)
+    alphas = np.array([0.0, 0.45, 0.75, 0.88, 0.95], np.float32)
+    v = np.clip(np.nan_to_num(val, nan=0), 0, 1)
+    rgb = np.stack([np.interp(v, stops, cols[:, k]) for k in range(3)], -1)
+    alpha = np.where(np.isnan(val), 0, np.interp(v, stops, alphas) * 255).astype(np.uint8)
     img = Image.fromarray(np.dstack([rgb.astype(np.uint8), alpha]), "RGBA")
     buf = io.BytesIO()
     img.save(buf, "PNG", optimize=True)
@@ -161,6 +173,38 @@ if __name__ == "__main__":
     a = ap.parse_args()
     if a.precompute:
         precompute(a.workers)
+
+
+_warm_q: "queue.Queue[str] | None" = None
+_warm_seen: set[str] = set()
+WARM_HOURS = (1, -1, 2, -2, 3, 6, -6, 12, 24)
+
+
+def _warm_worker() -> None:
+    from . import diskcache
+
+    assert _warm_q is not None
+    while True:
+        iso = _warm_q.get()
+        try:
+            diskcache.cached_bytes("polar_png", iso, lambda: png(iso))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("polar map prewarm failed for %s: %s", iso, exc)
+
+
+def prewarm(t: datetime) -> None:
+    """Render the polar AI map for the hours around t in the background (one low-key thread)."""
+    global _warm_q
+    if _warm_q is None:
+        _warm_q = queue.Queue()
+        threading.Thread(target=_warm_worker, name="polar-prewarm", daemon=True).start()
+    for h in WARM_HOURS:
+        iso = (t + timedelta(hours=h)).isoformat()
+        if iso not in _warm_seen:
+            if len(_warm_seen) > 5000:
+                _warm_seen.clear()
+            _warm_seen.add(iso)
+            _warm_q.put(iso)
 
 
 def region_summaries(regions: list[dict], when_iso: str) -> list[dict]:

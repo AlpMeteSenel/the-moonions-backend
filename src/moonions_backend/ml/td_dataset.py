@@ -53,11 +53,13 @@ def planning_features(lat: float, lon: float) -> dict:
     """Everything a planner can compute from the 80 m maps (no 20 m truth)."""
     dem = get_dem()
     src = dem.source_for(lat)
+    db = get_craters()
+    if db is None:
+        raise FileNotFoundError("Robbins crater database required for touchdown-model features; no zero-density substitute is used.")
     t = analyze_zone(lat, lon, 300.0, source=src)
     ph = touchdown(lat, lon, DEFAULT, truth=src)
-    db = get_craters()
-    c5 = db.around(lat, lon, 5000) if db else {"density_per_1000km2": 0.0}
-    c1 = db.around(lat, lon, 1500) if db else {"nearest_rim_km": None, "inside_crater": False}
+    c5 = db.around(lat, lon, 5000)
+    c1 = db.around(lat, lon, 1500)
     rim = c1.get("nearest_rim_km")
     return {
         "slope_deg": t.slope_deg,

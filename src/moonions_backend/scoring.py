@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 
 import numpy as np
 
-from . import ml_inference
 from .craters import get_craters
 from .ephemeris import sky_from_site, time_range, to_utc
 from .horizon import Horizon
@@ -55,7 +54,7 @@ def smooth(x, lo, hi):
 @dataclass
 class Factor:
     key: str
-    score: float
+    score: float | None
     summary: str
     details: dict = field(default_factory=dict)
     hard_fail: bool = False
@@ -64,7 +63,7 @@ class Factor:
         return {
             "key": self.key,
             "label": FACTOR_LABELS[self.key],
-            "score": round(float(self.score), 1),
+            "score": None if self.score is None else round(float(self.score), 1),
             "summary": self.summary,
             "details": self.details,
             "hard_fail": self.hard_fail,
@@ -164,7 +163,7 @@ def earth_factor(sky: dict, hz: Horizon, mission_steps: int) -> Factor:
 def crater_factor(lat: float, lon: float) -> Factor:
     db = get_craters()
     if db is None:
-        return Factor("craters", 60.0, "Crater database not loaded; neutral score.", {"available": False})
+        return Factor("craters", None, "Crater database unavailable; crater risk not assessed.", {"available": False})
     c5 = db.around(lat, lon, 5_000)
     c1 = db.around(lat, lon, 1_500)
     dens = c5["density_per_1000km2"]
@@ -184,18 +183,11 @@ def crater_factor(lat: float, lon: float) -> Factor:
 
 
 def science_factor(lat: float, tags: list[str] | None = None) -> Factor:
-    a = abs(lat)
-    polar = float(smooth(a, 70, 88))
-    score = 35 + 60 * polar
-    if tags and "science" in tags:
-        score = min(100, score + 15)
-    if a > 84:
-        msg = "Next to permanently shadowed craters that may hold water ice."
-    elif a > 75:
-        msg = "Polar region: within reach of cold, ice-bearing terrain."
-    else:
-        msg = "Low-latitude site: well-studied terrain, far from polar ice."
-    return Factor("science", score, msg, {"abs_latitude": round(a, 2)})
+    return Factor(
+        "science", None,
+        "Science value not assessed: no cold-trap, ice-abundance or science-target layers are integrated.",
+        {"available": False},
+    )
 
 
 # ---------------------------------------------------------------- evaluation
@@ -223,9 +215,9 @@ def evaluate_site(lat: float, lon: float, p: EvalParams, with_backups: bool = Tr
     terrain = terrain or analyze_zone(lat, lon, p.zone_radius_m)
     sky, steps = mission_sky(lat, lon, p)
     hz = sky["horizon"]
-    ai = ml_inference.predict(lat, lon)
     factors = {
-        "ground": ground_factor(terrain, ai),
+        # Keep the rule score independent of the optional auto-labelled hazard model.
+        "ground": ground_factor(terrain, None),
         "sunlight": sunlight_factor(sky, hz, steps),
         "earth": earth_factor(sky, hz, steps),
         "craters": crater_factor(lat, lon),
@@ -249,6 +241,8 @@ def evaluate_site(lat: float, lon: float, p: EvalParams, with_backups: bool = Tr
         "factors": [f.to_dict() for f in factors.values()],
         "terrain": terrain.to_dict(),
         "horizon": hz.to_dict(),
+        "score_basis": "Heuristic planning rules applied to measured terrain and computed visibility; not a measured landing-success probability.",
+        "unassessed_factors": [f.key for f in factors.values() if f.score is None],
     }
     if backups is not None:
         out["backups"] = backups["sites"]
@@ -258,7 +252,11 @@ def evaluate_site(lat: float, lon: float, p: EvalParams, with_backups: bool = Tr
 
 def combine(factors: dict[str, Factor], profile: str) -> tuple[float, str, list[str]]:
     w = PROFILES.get(profile, PROFILES["balanced"])
-    keys = [k for k in w if k in factors]
+    keys = [k for k in w if k in factors and factors[k].score is not None]
+    missing = [FACTOR_LABELS[k] for k in w if k in factors and factors[k].score is None]
+    incomplete = [f"Not assessed: {', '.join(missing)}."] if missing else []
+    if not keys:
+        return 0.0, "no-go", incomplete or ["No assessed factors."]
     tot = sum(w[k] for k in keys)
     overall = sum(w[k] * factors[k].score for k in keys) / tot
     fails = [factors[k].summary for k in keys if factors[k].hard_fail]
@@ -267,12 +265,12 @@ def combine(factors: dict[str, Factor], profile: str) -> tuple[float, str, list[
     weak = [FACTOR_LABELS[k] for k in keys if k in floors and factors[k].score < floors[k] and not factors[k].hard_fail]
     if fails:
         overall = min(overall, 35.0)
-        return overall, "no-go", fails
+        return overall, "no-go", fails + incomplete
     if overall >= 70 and not weak:
-        return overall, "go", ["All factors within limits."]
+        return (overall, "caution", incomplete) if missing else (overall, "go", ["All factors within limits."])
     if overall >= 45:
-        return overall, "caution", [f"Weak: {', '.join(weak)}"] if weak else ["Some factors are marginal."]
-    return overall, "no-go", [f"Weak: {', '.join(weak)}"] if weak else ["Overall suitability too low."]
+        return overall, "caution", ([f"Weak: {', '.join(weak)}"] if weak else ["Some factors are marginal."]) + incomplete
+    return overall, "no-go", ([f"Weak: {', '.join(weak)}"] if weak else ["Overall suitability too low."]) + incomplete
 
 
 # ---------------------------------------------------------------- timeline

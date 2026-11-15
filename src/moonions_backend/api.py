@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query, Response
@@ -13,18 +13,25 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import ai, ai_polar, conditions, ml_inference, regions, store
+from . import ai, ai_polar, conditions, diskcache, ml_inference, regions, store
 from .backups import suggest_in_region
 from .config import CORS_ORIGINS, TEXTURES
 from .craters import get_craters
 from .dem import get_dem
 from .ephemeris import sun_and_earth_points
+from .provenance import data_provenance
 from .scoring import FACTOR_LABELS, PROFILES, EvalParams, evaluate_site, timeline
 from .sites import SITES
 from .terrain import terrain_patch
 
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="Lunar Landing Site Navigator", version="0.1.0")
+
+
+@app.on_event("startup")
+def _warm_ai_maps():
+    # load the AI model and polar grid off the request path, and render the maps around "now"
+    ai_polar.prewarm(datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0) - timedelta(hours=1))
 
 
 @app.on_event("shutdown")
@@ -34,6 +41,24 @@ def _stop_workers():
     shutdown_pool()
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(GZipMiddleware, minimum_size=2048)
+
+# GET results for an explicit time (or pure terrain) never change: let browsers keep them, so
+# scrubbing back and reloading the page are instant. "Now"-dependent calls are left uncached.
+_TIMED = ("time", "start", "landing_time")
+_IMMUTABLE_PATHS = ("/api/terrain",)
+_NEVER = ("/api/agents", "/api/proposals", "/api/health")
+
+
+@app.middleware("http")
+async def cache_headers(request, call_next):
+    resp = await call_next(request)
+    path = request.url.path
+    if request.method == "GET" and resp.status_code == 200 and path.startswith("/api/") and not path.startswith(_NEVER) and "cache-control" not in resp.headers:
+        if path.startswith(_IMMUTABLE_PATHS) or any(k in request.query_params for k in _TIMED):
+            resp.headers["Cache-Control"] = "public, max-age=86400"
+        elif path == "/api/sites":
+            resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
 app.mount("/static/textures", StaticFiles(directory=TEXTURES), name="textures")
 
 Profile = Literal["balanced", "safety-first", "science-first"]
@@ -109,6 +134,7 @@ def health():
         "textures": sorted(p.name for p in TEXTURES.glob("*") if p.is_file()),
         "profiles": PROFILES,
         "factor_labels": FACTOR_LABELS,
+        "data_provenance": data_provenance(),
     }
 
 
@@ -237,13 +263,15 @@ def ai_site_map(lat: float, lon: float, landing_time: datetime, half_size_m: flo
 
 @app.get("/api/ai/timeline")
 def ai_timeline(lat: float, lon: float, start: datetime, days: float = Query(30.0, gt=0, le=90), step_hours: float = Query(6.0, ge=1, le=48)):
-    return ai.timeline(lat, _norm_lon(lon), start, days, step_hours)
+    key = [round(lat, 6), _norm_lon(lon), start.isoformat(), days, step_hours]
+    return diskcache.cached_json("ai_tl", key, lambda: ai.timeline(lat, _norm_lon(lon), start, days, step_hours))
 
 
 @app.get("/api/ai/polar-map.png")
 def ai_polar_map(time: datetime):
     t = time.replace(minute=0, second=0, microsecond=0)  # hourly cache granularity
-    data = ai_polar.png(t.isoformat())
+    data = diskcache.cached_bytes("polar_png", t.isoformat(), lambda: ai_polar.png(t.isoformat()))
+    ai_polar.prewarm(t)  # the hours either side are what the timeline asks for next
     if data is None:
         raise HTTPException(404, "AI polar map unavailable (model or grid not ready)")
     return Response(data, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
@@ -256,7 +284,8 @@ def region_analyze(lat: float, lon: float, landing_time: datetime, half_size_m: 
 
 @app.get("/api/regions/timeline")
 def region_timeline(lat: float, lon: float, start: datetime, half_size_m: float = Query(7500.0, ge=500, le=20000), days: float = Query(30.0, gt=0, le=90), step_hours: float = Query(6.0, ge=1, le=48)):
-    return regions.timeline(lat, _norm_lon(lon), half_size_m, start, days, step_hours)
+    key = [round(lat, 6), _norm_lon(lon), half_size_m, start.isoformat(), days, step_hours]
+    return diskcache.cached_json("region_tl", key, lambda: regions.timeline(lat, _norm_lon(lon), half_size_m, start, days, step_hours))
 
 
 class SummaryRequest(BaseModel):

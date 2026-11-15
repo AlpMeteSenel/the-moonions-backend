@@ -52,11 +52,11 @@ def available() -> bool:
 
 
 def geoid_height(lat, lon) -> np.ndarray:
-    """Geoid height N (m) above the 1737.4 km sphere; zeros if the model isn't built."""
+    """Geoid height N (m) above the 1737.4 km sphere; requires the GRAIL grid."""
     g = _geoid()
     lat = np.asarray(lat, dtype=np.float64)
     if g is None:
-        return np.zeros_like(lat)
+        raise FileNotFoundError("GRAIL geoid unavailable. Run python -m moonions_backend.gravity --build.")
     N, lats, lons = g
     dlat = lats[0] - lats[1]
     dlon = lons[1] - lons[0]

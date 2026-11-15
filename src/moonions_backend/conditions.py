@@ -23,7 +23,7 @@ import numpy as np
 
 from .ephemeris import to_utc
 from .horizon import Horizon
-from .ml.simulate import DEFAULT, energy_soc
+from .ml.simulate import DEFAULT
 from .ml.sky import body_vectors_km, sky_many
 
 SUN_RADIUS_KM = 695_700.0
@@ -153,6 +153,11 @@ def site_conditions(
     if eclipsed[0] > 0.001 and not eclipses:
         eclipses.append({"start": start.isoformat(), "end": None, "max_covered": round(float(eclipsed.max()), 3)})
 
+    from .thermal import site_temperature
+
+    th = site_temperature(lat, lon, times, s, step_h, comm_mask_deg)
+    temp = th["temp_k"]
+
     every = max(1, int(60 / step_min))  # hourly series for charts
     track_every = max(1, int(180 / step_min))
     return {
@@ -195,6 +200,16 @@ def site_conditions(
             "sunlit_share": round(float(lit[:m].mean()), 3),
             "earth_share": round(float(earth_ok[:m].mean()), 3),
         },
+        "thermal": {
+            "now_k": round(float(temp[0]), 1),
+            "stay_min_k": round(float(temp[:m].min()), 1),
+            "stay_max_k": round(float(temp[:m].max()), 1),
+            "period_min_k": round(float(temp.min()), 1),
+            "period_max_k": round(float(temp.max()), 1),
+            "slope_deg": round(th["slope_deg"], 1),
+            "aspect_deg": round(th["aspect_deg"], 0),
+            "deep_k": round(th["deep_k"], 1),
+        },
         "eclipses": eclipses,
         "horizon": {"azimuth_step_deg": 0.5, "elevation_deg": np.round(hz.profile, 2).tolist()},
         "series": {
@@ -204,6 +219,7 @@ def site_conditions(
             "sun_visible_fraction": np.round(sun_frac[::every], 3).tolist(),
             "earth_above_skyline": np.round(earth_clear[::every], 2).tolist(),
             "battery": np.round(soc[::every], 3).tolist(),
+            "surface_temp_k": np.round(temp[::every], 1).tolist(),
         },
         "tracks": {
             "sun": [[round(float(a), 1), round(float(e), 2)] for a, e in zip(s["sun_az"][::track_every], s["sun_el"][::track_every])],
